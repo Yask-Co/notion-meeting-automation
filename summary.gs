@@ -71,12 +71,6 @@ function createDailySummaryPage(meetingIds, taskIds) {
     });
   });
 
-  children.push(headingBlock_(2, 'Action Items Created'));
-  taskIds.forEach(function(taskId) {
-    var page = notionGet('/pages/' + taskId);
-    children.push(linkBulletBlock_(pageTitle_(page), page.url));
-  });
-
   var summaryPage = notionPost('/pages', {
     parent: { type: 'data_source_id', data_source_id: getSummaryDbId() },
     properties: {
