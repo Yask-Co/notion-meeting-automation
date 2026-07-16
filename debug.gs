@@ -6,7 +6,7 @@
  * tools may show). Delete once extractActionItems() is built.
  */
 function debugDumpMeetingPage() {
-  var pageId = '39e2d514-fe3a-816f-9e3c-fc540c68fdad'; // "Sync on Ramp" meeting note
+  var pageId = '39f2d514-fe3a-808c-9ca2-d4a0e94b22ee'; // "test block" meeting note (now DB-linked and accessible)
 
   Logger.log('debugDumpMeetingPage: fetching page metadata for ' + pageId);
   var page = notionGet('/pages/' + pageId);
