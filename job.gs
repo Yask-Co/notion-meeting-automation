@@ -24,7 +24,7 @@ function runDailyJob() {
     var projectRelation = meeting.properties['Project'] && meeting.properties['Project'].relation;
     var projectId = (projectRelation && projectRelation.length > 0) ? projectRelation[0].id : null;
 
-    taskPages = taskPages.concat(createTaskPages(actionItems, projectId));
+    taskPages = taskPages.concat(createTaskPages(actionItems, projectId, meeting.id));
   });
 
   var taskIds = taskPages.map(function(p) { return p.id; });
