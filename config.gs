@@ -6,6 +6,9 @@ var NOTION_BASE_URL    = 'https://api.notion.com/v1';
 var MEETINGS_DB_ID = '39b2d514-fe3a-803d-b5bb-000bc511b02f';
 var TASKS_DB_ID    = '39b2d514-fe3a-809f-87ad-000bfb8b7851';
 
+// Page shared with the integration to hold the Summary database (setupSummaryDatabase() creates it as a child of this page).
+var SUMMARY_PARENT_PAGE_ID = '39f2d514-fe3a-80cf-8008-fdb0ef4ab43f';
+
 // ── Script Properties accessors ─────────────────────────────────────────────
 
 function getNotionToken() {
