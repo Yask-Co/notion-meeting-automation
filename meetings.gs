@@ -66,36 +66,44 @@ function addMeetingDatePropertyToMeetings() {
 }
 
 /**
+ * Finds the Google Calendar event matching a meeting's start/end time and
+ * returns its guests' email addresses — internal and external alike,
+ * since Google Calendar invites always carry an email regardless of
+ * whether that person has any Notion account. Returns [] if no matching
+ * event is found.
+ */
+function getGoogleCalendarAttendeeEmails_(startTime, endTime) {
+  var events = CalendarApp.getDefaultCalendar().getEvents(new Date(startTime), new Date(endTime));
+  if (events.length === 0) return [];
+
+  return events[0].getGuestList().map(function(guest) { return guest.getEmail(); });
+}
+
+/**
  * Sets a meeting page's "Meeting Date" and "Attendee Names" properties
  * from its calendar event (pulled from the transcription block, not
  * written by the user) — the actual meeting time/attendees, as opposed
  * to "Created on" which is just when the Notion page itself was created.
- * Attendees are resolved to individual multi-select tags (not the native
- * people-type Attendees property) specifically to avoid Notion's
- * assignment/mention notification emails, while still keeping each name
- * separately filterable. No-ops silently if the page has no transcription
- * block or calendar event.
+ * Attendees are read directly from the matching Google Calendar event
+ * (by email, covering internal and external guests alike) rather than
+ * resolved through Notion's /users/{id} endpoint — that only works for
+ * workspace members/guests, and separately, writing to a Notion
+ * people-type property would trigger an assignment/mention notification
+ * email to everyone listed. Reading emails from Google Calendar and
+ * writing them as multi-select tags avoids both problems entirely.
+ * No-ops silently if the page has no transcription block or calendar event.
  */
 function syncMeetingCalendarFields_(meetingId) {
   var transcriptionBlock = getTranscriptionBlock_(meetingId);
   var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
   if (!calendarEvent) return;
 
-  // Attendees outside the workspace (external guests) can't be resolved via
-  // /users/{id} — skip those rather than failing the whole sync.
-  var attendeeNames = (calendarEvent.attendees || []).map(function(userId) {
-    try {
-      return notionGet('/users/' + userId).name;
-    } catch (e) {
-      Logger.log('syncMeetingCalendarFields_: could not resolve user ' + userId + ' — skipping');
-      return null;
-    }
-  }).filter(function(name) { return name; });
+  var attendeeEmails = getGoogleCalendarAttendeeEmails_(calendarEvent.start_time, calendarEvent.end_time);
 
   notionPatch('/pages/' + meetingId, {
     properties: {
       'Meeting Date': { date: { start: calendarEvent.start_time } },
-      'Attendee Names': { multi_select: attendeeNames.map(function(name) { return { name: name }; }) }
+      'Attendee Names': { multi_select: attendeeEmails.map(function(email) { return { name: email }; }) }
     }
   });
 }
