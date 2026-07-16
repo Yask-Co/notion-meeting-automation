@@ -36,7 +36,7 @@ function runDailyJob() {
 
 /**
  * Phase 7 — One-time setup: installs a daily time-based trigger for
- * runDailyJob() at 6 AM (script timezone). Safe to run more than once;
+ * runDailyJob() at 8 PM (script timezone). Safe to run more than once;
  * will not create duplicate triggers.
  */
 function installDailyTrigger() {
@@ -51,9 +51,9 @@ function installDailyTrigger() {
 
   ScriptApp.newTrigger('runDailyJob')
     .timeBased()
-    .atHour(6)
+    .atHour(20)
     .everyDays(1)
     .create();
 
-  Logger.log('installDailyTrigger: daily trigger installed for 6 AM');
+  Logger.log('installDailyTrigger: daily trigger installed for 8 PM');
 }
