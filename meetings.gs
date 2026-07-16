@@ -81,9 +81,16 @@ function syncMeetingCalendarFields_(meetingId) {
   var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
   if (!calendarEvent) return;
 
+  // Attendees outside the workspace (external guests) can't be resolved via
+  // /users/{id} — skip those rather than failing the whole sync.
   var attendeeNames = (calendarEvent.attendees || []).map(function(userId) {
-    return notionGet('/users/' + userId).name;
-  });
+    try {
+      return notionGet('/users/' + userId).name;
+    } catch (e) {
+      Logger.log('syncMeetingCalendarFields_: could not resolve user ' + userId + ' — skipping');
+      return null;
+    }
+  }).filter(function(name) { return name; });
 
   notionPatch('/pages/' + meetingId, {
     properties: {
