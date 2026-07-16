@@ -21,3 +21,13 @@ function debugDumpMeetingPage() {
     Logger.log(JSON.stringify(block));
   });
 }
+
+/**
+ * Confirms which Notion workspace "Megan S - Clasp Token" is actually
+ * scoped to, by asking the API who the bot itself is. If this doesn't
+ * match the workspace where the meeting notes live, that's the whole bug.
+ */
+function debugWhoAmI() {
+  var me = notionGet('/users/me');
+  Logger.log('debugWhoAmI: ' + JSON.stringify(me));
+}
