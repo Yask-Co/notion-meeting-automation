@@ -44,36 +44,49 @@ function fetchNewMeetings() {
 }
 
 /**
- * One-time setup: adds a "Meeting Date" property to the Meetings database
- * (distinct from the auto-generated "Created on"). Run this once before
- * using setMeetingDate_(). Safe to run more than once.
+ * One-time setup: adds a "Meeting Date" property (distinct from the
+ * auto-generated "Created on") and an "Attendee Names" text property
+ * (plain text, not the native people-type Attendees — that type triggers
+ * a Notion assignment/mention notification email to everyone listed,
+ * which we don't want) to the Meetings database. Run this once before
+ * using syncMeetingCalendarFields_(). Safe to run more than once.
  */
 function addMeetingDatePropertyToMeetings() {
   Logger.log('addMeetingDatePropertyToMeetings: start');
 
   notionPatch('/data_sources/' + MEETINGS_DB_ID, {
-    properties: { 'Meeting Date': { date: {} } }
+    properties: {
+      'Meeting Date': { date: {} },
+      'Attendee Names': { rich_text: {} }
+    }
   });
 
-  Logger.log('addMeetingDatePropertyToMeetings: done — "Meeting Date" property added to Meetings database');
+  Logger.log('addMeetingDatePropertyToMeetings: done — "Meeting Date" and "Attendee Names" properties added to Meetings database');
 }
 
 /**
- * Sets a meeting page's "Meeting Date" and "Attendees" properties from its
- * calendar event (pulled from the transcription block, not written by the
- * user) — the actual meeting time/attendees, as opposed to "Created on"
- * which is just when the Notion page itself was created. No-ops silently
- * if the page has no transcription block or calendar event.
+ * Sets a meeting page's "Meeting Date" and "Attendee Names" properties
+ * from its calendar event (pulled from the transcription block, not
+ * written by the user) — the actual meeting time/attendees, as opposed
+ * to "Created on" which is just when the Notion page itself was created.
+ * Attendees are resolved to plain-text names (not the native people-type
+ * Attendees property) specifically to avoid Notion's assignment/mention
+ * notification emails going out to everyone listed. No-ops silently if
+ * the page has no transcription block or calendar event.
  */
 function syncMeetingCalendarFields_(meetingId) {
   var transcriptionBlock = getTranscriptionBlock_(meetingId);
   var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
   if (!calendarEvent) return;
 
+  var attendeeNames = (calendarEvent.attendees || []).map(function(userId) {
+    return notionGet('/users/' + userId).name;
+  }).join(', ');
+
   notionPatch('/pages/' + meetingId, {
     properties: {
       'Meeting Date': { date: { start: calendarEvent.start_time } },
-      'Attendees': { people: (calendarEvent.attendees || []).map(function(userId) { return { id: userId }; }) }
+      'Attendee Names': { rich_text: [{ text: { content: attendeeNames } }] }
     }
   });
 }
