@@ -16,12 +16,17 @@ function runDailyJob() {
 
   var meetingIds = meetings.map(function(m) { return m.id; });
 
-  var actionItems = [];
-  meetingIds.forEach(function(meetingId) {
-    actionItems = actionItems.concat(extractActionItems(meetingId));
+  var taskPages = [];
+  meetings.forEach(function(meeting) {
+    var actionItems = extractActionItems(meeting.id);
+
+    // Inherit the meeting's own Project relation onto its tasks, if set.
+    var projectRelation = meeting.properties['Project'] && meeting.properties['Project'].relation;
+    var projectId = (projectRelation && projectRelation.length > 0) ? projectRelation[0].id : null;
+
+    taskPages = taskPages.concat(createTaskPages(actionItems, projectId));
   });
 
-  var taskPages = createTaskPages(actionItems);
   var taskIds = taskPages.map(function(p) { return p.id; });
 
   var summaryPage = createDailySummaryPage(meetingIds, taskIds);
