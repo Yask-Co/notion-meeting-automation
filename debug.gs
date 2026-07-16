@@ -61,6 +61,21 @@ function debugTestCreateDailySummaryPage() {
 }
 
 /**
+ * Removes any existing runDailyJob triggers (e.g. a stale one installed
+ * at the wrong hour), so installDailyTrigger() can be re-run cleanly to
+ * install the current schedule.
+ */
+function debugDeleteDailyJobTriggers() {
+  var triggers = ScriptApp.getProjectTriggers().filter(function(t) {
+    return t.getHandlerFunction() === 'runDailyJob';
+  });
+
+  triggers.forEach(function(t) { ScriptApp.deleteTrigger(t); });
+
+  Logger.log('debugDeleteDailyJobTriggers: removed ' + triggers.length + ' trigger(s)');
+}
+
+/**
  * Dumps the raw block children of a meeting note's summary block, so we
  * can see exactly how Notion stores the "### Action Items" markdown text
  * (literal text in a paragraph vs. native heading/to_do blocks) before
