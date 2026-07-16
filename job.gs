@@ -2,19 +2,53 @@
  * Phase 6 — Orchestrates the full daily pipeline.
  * This is the function the time-based trigger will call.
  *
- * Stub — implement after all component functions are verified.
+ * Run this function directly in the Apps Script editor to verify the
+ * whole pipeline end-to-end before installing the daily trigger.
  */
 function runDailyJob() {
-  Logger.log('runDailyJob: stub called');
+  Logger.log('runDailyJob: start');
+
+  var meetings = fetchNewMeetings();
+  if (meetings.length === 0) {
+    Logger.log('runDailyJob: no new meetings found — nothing to do');
+    return;
+  }
+
+  var meetingIds = meetings.map(function(m) { return m.id; });
+
+  var actionItems = [];
+  meetingIds.forEach(function(meetingId) {
+    actionItems = actionItems.concat(extractActionItems(meetingId));
+  });
+
+  var taskPages = createTaskPages(actionItems);
+  var taskIds = taskPages.map(function(p) { return p.id; });
+
+  var summaryPage = createDailySummaryPage(meetingIds, taskIds);
+
+  Logger.log('runDailyJob: complete — summary page ' + summaryPage.url);
 }
 
 /**
  * Phase 7 — One-time setup: installs a daily time-based trigger for
  * runDailyJob() at 6 AM (script timezone). Safe to run more than once;
  * will not create duplicate triggers.
- *
- * Stub — implement last, after runDailyJob() is verified end-to-end.
  */
 function installDailyTrigger() {
-  Logger.log('installDailyTrigger: stub called');
+  var alreadyInstalled = ScriptApp.getProjectTriggers().some(function(trigger) {
+    return trigger.getHandlerFunction() === 'runDailyJob';
+  });
+
+  if (alreadyInstalled) {
+    Logger.log('installDailyTrigger: trigger already exists — skipping');
+    return;
+  }
+
+  ScriptApp.newTrigger('runDailyJob')
+    .timeBased()
+    .atHour(6)
+    .everyDays(1)
+    .create();
+
+  Logger.log('installDailyTrigger: daily trigger installed for 6 AM');
 }
