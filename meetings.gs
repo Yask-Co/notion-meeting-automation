@@ -77,3 +77,33 @@ function syncMeetingCalendarFields_(meetingId) {
     }
   });
 }
+
+/**
+ * One-time backfill: runs syncMeetingCalendarFields_() across every page
+ * currently in the Meetings database (not just the last 24 hours), so
+ * existing meetings get Meeting Date/Attendees populated too. Safe to run
+ * more than once — pages without a transcription block are just skipped.
+ */
+function backfillMeetingCalendarFields() {
+  Logger.log('backfillMeetingCalendarFields: start');
+
+  var meetings = [];
+  var cursor   = null;
+
+  do {
+    var payload = cursor ? { start_cursor: cursor } : {};
+    var result  = notionPost('/data_sources/' + MEETINGS_DB_ID + '/query', payload);
+
+    meetings = meetings.concat(result.results || []);
+    cursor   = result.has_more ? result.next_cursor : null;
+  } while (cursor);
+
+  Logger.log('backfillMeetingCalendarFields: found ' + meetings.length + ' meeting(s) total');
+
+  meetings.forEach(function(m) {
+    syncMeetingCalendarFields_(m.id);
+    Logger.log('backfillMeetingCalendarFields: synced ' + m.id);
+  });
+
+  Logger.log('backfillMeetingCalendarFields: done');
+}
