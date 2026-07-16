@@ -64,3 +64,45 @@ function notionGetAllChildren(blockId) {
 
   return results;
 }
+
+// ── Meeting-notes block helpers ─────────────────────────────────────────────
+
+// Finds a meeting page's "transcription" block and returns the raw block
+// children of its summary_block_id, or null if the page has no meeting notes.
+function getMeetingSummaryBlocks_(pageId) {
+  var pageBlocks = notionGetAllChildren(pageId);
+  var transcriptionBlock = pageBlocks.filter(function(b) { return b.type === 'transcription'; })[0];
+  if (!transcriptionBlock) return null;
+
+  return notionGetAllChildren(transcriptionBlock.transcription.children.summary_block_id);
+}
+
+// Extracts the plain-text title from a Notion page object's title property.
+function pageTitle_(page) {
+  var titleProp = Object.keys(page.properties)
+    .map(function(k) { return page.properties[k]; })
+    .filter(function(p) { return p.type === 'title'; })[0];
+
+  return titleProp.title.map(function(rt) { return rt.plain_text; }).join('').trim();
+}
+
+// Strips a fetched block down to the minimal shape Notion's block-creation
+// API accepts (type + that type's own data), dropping ids/timestamps/etc.
+function toCreatableBlock_(block) {
+  var creatable = { type: block.type };
+  creatable[block.type] = block[block.type];
+  return creatable;
+}
+
+function headingBlock_(level, text) {
+  var block = { type: 'heading_' + level };
+  block['heading_' + level] = { rich_text: [{ text: { content: text } }] };
+  return block;
+}
+
+function linkBulletBlock_(text, url) {
+  return {
+    type: 'bulleted_list_item',
+    bulleted_list_item: { rich_text: [{ text: { content: text, link: { url: url } } }] }
+  };
+}

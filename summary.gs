@@ -38,11 +38,57 @@ function setupSummaryDatabase() {
 
 /**
  * Phase 5 — Create the daily summary page in the Summary database,
- * linking back to the meeting and task pages created today.
+ * linking back to the meeting and task pages created today. Body content
+ * (meeting list, full copied meeting notes, task list) is built directly
+ * from meetingIds/taskIds — no separate summaryText input needed.
  *
- * Stub — implement after createTaskPages() is verified.
+ * Run this function directly in the Apps Script editor to verify it
+ * creates a summary page before moving to phase 6.
  */
-function createDailySummaryPage(meetingIds, taskIds, summaryText) {
-  Logger.log('createDailySummaryPage: stub called — ' +
+function createDailySummaryPage(meetingIds, taskIds) {
+  Logger.log('createDailySummaryPage: start — ' +
     meetingIds.length + ' meeting(s), ' + taskIds.length + ' task(s)');
+
+  var todayLabel = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy');
+  var todayIso   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+  var children = [];
+
+  children.push(headingBlock_(2, 'Meetings'));
+  meetingIds.forEach(function(meetingId) {
+    var page = notionGet('/pages/' + meetingId);
+    children.push(linkBulletBlock_(pageTitle_(page), page.url));
+  });
+
+  children.push(headingBlock_(2, 'Meeting Notes'));
+  meetingIds.forEach(function(meetingId) {
+    var page = notionGet('/pages/' + meetingId);
+    children.push(headingBlock_(3, pageTitle_(page)));
+
+    var summaryBlocks = getMeetingSummaryBlocks_(meetingId) || [];
+    summaryBlocks.forEach(function(block) {
+      children.push(toCreatableBlock_(block));
+    });
+  });
+
+  children.push(headingBlock_(2, 'Action Items Created'));
+  taskIds.forEach(function(taskId) {
+    var page = notionGet('/pages/' + taskId);
+    children.push(linkBulletBlock_(pageTitle_(page), page.url));
+  });
+
+  var summaryPage = notionPost('/pages', {
+    parent: { type: 'data_source_id', data_source_id: getSummaryDbId() },
+    properties: {
+      'Name': { title: [{ text: { content: 'Daily Summary — ' + todayLabel } }] },
+      'Date': { date: { start: todayIso } },
+      'Type': { select: { name: 'Daily' } },
+      'Meetings': { relation: meetingIds.map(function(id) { return { id: id }; }) },
+      'Tasks Created': { relation: taskIds.map(function(id) { return { id: id }; }) }
+    },
+    children: children
+  });
+
+  Logger.log('createDailySummaryPage: created — ' + summaryPage.url);
+  return summaryPage;
 }

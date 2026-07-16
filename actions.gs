@@ -8,16 +8,12 @@
 function extractActionItems(pageId) {
   Logger.log('extractActionItems: start — pageId=' + pageId);
 
-  var pageBlocks = notionGetAllChildren(pageId);
-  var transcriptionBlock = pageBlocks.filter(function(b) { return b.type === 'transcription'; })[0];
+  var summaryBlocks = getMeetingSummaryBlocks_(pageId);
 
-  if (!transcriptionBlock) {
+  if (!summaryBlocks) {
     Logger.log('extractActionItems: no transcription block found on page ' + pageId);
     return [];
   }
-
-  var summaryBlockId = transcriptionBlock.transcription.children.summary_block_id;
-  var summaryBlocks = notionGetAllChildren(summaryBlockId);
 
   var actionItems = [];
   var inActionItems = false;

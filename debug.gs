@@ -50,6 +50,17 @@ function debugTestCreateTaskPages() {
 }
 
 /**
+ * Zero-argument wrapper exercising createDailySummaryPage() against the
+ * known test meeting and the 3 task pages already created from it.
+ */
+function debugTestCreateDailySummaryPage() {
+  createDailySummaryPage(
+    ['39f2d514-fe3a-808c-9ca2-d4a0e94b22ee'],
+    ['39f2d514-fe3a-81d5-b1bd-f99a4dbdcb50', '39f2d514-fe3a-8188-a4b8-d48db6bc0b00', '39f2d514-fe3a-81fa-bdd6-f1a97ea20bc4']
+  );
+}
+
+/**
  * Dumps the raw block children of a meeting note's summary block, so we
  * can see exactly how Notion stores the "### Action Items" markdown text
  * (literal text in a paragraph vs. native heading/to_do blocks) before
