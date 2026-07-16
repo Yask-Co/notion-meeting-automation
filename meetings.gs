@@ -42,3 +42,35 @@ function fetchNewMeetings() {
 
   return meetings;
 }
+
+/**
+ * One-time setup: adds a "Meeting Date" property to the Meetings database
+ * (distinct from the auto-generated "Created on"). Run this once before
+ * using setMeetingDate_(). Safe to run more than once.
+ */
+function addMeetingDatePropertyToMeetings() {
+  Logger.log('addMeetingDatePropertyToMeetings: start');
+
+  notionPatch('/data_sources/' + MEETINGS_DB_ID, {
+    properties: { 'Meeting Date': { date: {} } }
+  });
+
+  Logger.log('addMeetingDatePropertyToMeetings: done — "Meeting Date" property added to Meetings database');
+}
+
+/**
+ * Sets a meeting page's "Meeting Date" property from its calendar event's
+ * start time (pulled from the transcription block, not written by the
+ * user) — the actual meeting time, as opposed to "Created on" which is
+ * just when the Notion page itself was created. No-ops silently if the
+ * page has no transcription block or calendar event.
+ */
+function setMeetingDate_(meetingId) {
+  var transcriptionBlock = getTranscriptionBlock_(meetingId);
+  var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
+  if (!calendarEvent) return;
+
+  notionPatch('/pages/' + meetingId, {
+    properties: { 'Meeting Date': { date: { start: calendarEvent.start_time } } }
+  });
+}

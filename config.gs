@@ -67,11 +67,16 @@ function notionGetAllChildren(blockId) {
 
 // ── Meeting-notes block helpers ─────────────────────────────────────────────
 
-// Finds a meeting page's "transcription" block and returns the raw block
-// children of its summary_block_id, or null if the page has no meeting notes.
-function getMeetingSummaryBlocks_(pageId) {
+// Finds a meeting page's "transcription" block, or null if the page has no meeting notes.
+function getTranscriptionBlock_(pageId) {
   var pageBlocks = notionGetAllChildren(pageId);
-  var transcriptionBlock = pageBlocks.filter(function(b) { return b.type === 'transcription'; })[0];
+  return pageBlocks.filter(function(b) { return b.type === 'transcription'; })[0] || null;
+}
+
+// Returns the raw block children of a meeting's summary_block_id, or null
+// if the page has no meeting notes.
+function getMeetingSummaryBlocks_(pageId) {
+  var transcriptionBlock = getTranscriptionBlock_(pageId);
   if (!transcriptionBlock) return null;
 
   return notionGetAllChildren(transcriptionBlock.transcription.children.summary_block_id);

@@ -18,6 +18,7 @@ function runDailyJob() {
 
   var taskPages = [];
   meetings.forEach(function(meeting) {
+    setMeetingDate_(meeting.id);
     var actionItems = extractActionItems(meeting.id);
 
     // Inherit the meeting's own Project relation onto its tasks, if set.
