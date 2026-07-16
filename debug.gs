@@ -61,13 +61,13 @@ function debugTestCreateDailySummaryPage() {
 }
 
 /**
- * Zero-argument wrapper exercising setMeetingDate_() against the known
- * test meetings, without running the full pipeline (which would create
- * duplicate task pages).
+ * Zero-argument wrapper exercising syncMeetingCalendarFields_() against a
+ * known test meeting, without running the full pipeline (which would
+ * create duplicate task pages).
  */
-function debugTestSetMeetingDate() {
-  setMeetingDate_('39f2d514-fe3a-8000-b026-eb5535694149'); // "Plan: GGP ethno" ("test block" was moved to Trash)
-  Logger.log('debugTestSetMeetingDate: done');
+function debugTestSyncMeetingCalendarFields() {
+  syncMeetingCalendarFields_('39f2d514-fe3a-8000-b026-eb5535694149'); // "Plan: GGP ethno" ("test block" was moved to Trash)
+  Logger.log('debugTestSyncMeetingCalendarFields: done');
 }
 
 /**

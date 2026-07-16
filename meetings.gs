@@ -59,18 +59,21 @@ function addMeetingDatePropertyToMeetings() {
 }
 
 /**
- * Sets a meeting page's "Meeting Date" property from its calendar event's
- * start time (pulled from the transcription block, not written by the
- * user) — the actual meeting time, as opposed to "Created on" which is
- * just when the Notion page itself was created. No-ops silently if the
- * page has no transcription block or calendar event.
+ * Sets a meeting page's "Meeting Date" and "Attendees" properties from its
+ * calendar event (pulled from the transcription block, not written by the
+ * user) — the actual meeting time/attendees, as opposed to "Created on"
+ * which is just when the Notion page itself was created. No-ops silently
+ * if the page has no transcription block or calendar event.
  */
-function setMeetingDate_(meetingId) {
+function syncMeetingCalendarFields_(meetingId) {
   var transcriptionBlock = getTranscriptionBlock_(meetingId);
   var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
   if (!calendarEvent) return;
 
   notionPatch('/pages/' + meetingId, {
-    properties: { 'Meeting Date': { date: { start: calendarEvent.start_time } } }
+    properties: {
+      'Meeting Date': { date: { start: calendarEvent.start_time } },
+      'Attendees': { people: (calendarEvent.attendees || []).map(function(userId) { return { id: userId }; }) }
+    }
   });
 }
