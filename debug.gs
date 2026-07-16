@@ -33,6 +33,14 @@ function debugWhoAmI() {
 }
 
 /**
+ * Zero-argument wrapper so the Apps Script editor's Run button can
+ * exercise extractActionItems() against the known test meeting.
+ */
+function debugTestExtractActionItems() {
+  extractActionItems('39f2d514-fe3a-808c-9ca2-d4a0e94b22ee');
+}
+
+/**
  * Dumps the raw block children of a meeting note's summary block, so we
  * can see exactly how Notion stores the "### Action Items" markdown text
  * (literal text in a paragraph vs. native heading/to_do blocks) before
