@@ -31,3 +31,21 @@ function debugWhoAmI() {
   var me = notionGet('/users/me');
   Logger.log('debugWhoAmI: ' + JSON.stringify(me));
 }
+
+/**
+ * Dumps the raw block children of a meeting note's summary block, so we
+ * can see exactly how Notion stores the "### Action Items" markdown text
+ * (literal text in a paragraph vs. native heading/to_do blocks) before
+ * writing extractActionItems().
+ */
+function debugDumpSummaryBlock() {
+  var summaryBlockId = '39f2d514-fe3a-80e1-84fd-e610fe01450f'; // "test block" meeting's summary_block_id
+
+  var children = notionGetAllChildren(summaryBlockId);
+  Logger.log('debugDumpSummaryBlock: found ' + children.length + ' block(s)');
+
+  children.forEach(function(block, i) {
+    Logger.log('--- summary block ' + i + ' ---');
+    Logger.log(JSON.stringify(block));
+  });
+}
