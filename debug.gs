@@ -61,6 +61,17 @@ function debugTestCreateDailySummaryPage() {
 }
 
 /**
+ * Zero-argument wrapper exercising setMeetingDate_() against the known
+ * test meetings, without running the full pipeline (which would create
+ * duplicate task pages).
+ */
+function debugTestSetMeetingDate() {
+  setMeetingDate_('39f2d514-fe3a-808c-9ca2-d4a0e94b22ee'); // "test block"
+  setMeetingDate_('39f2d514-fe3a-8000-b026-eb5535694149'); // "Plan: GGP ethno"
+  Logger.log('debugTestSetMeetingDate: done');
+}
+
+/**
  * Removes any existing runDailyJob triggers (e.g. a stale one installed
  * at the wrong hour), so installDailyTrigger() can be re-run cleanly to
  * install the current schedule.
