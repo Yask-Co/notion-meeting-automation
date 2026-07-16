@@ -66,7 +66,7 @@ function debugTestCreateDailySummaryPage() {
  * create duplicate task pages).
  */
 function debugTestSyncMeetingCalendarFields() {
-  syncMeetingCalendarFields_('39f2d514-fe3a-8000-b026-eb5535694149'); // "Plan: GGP ethno" ("test block" was moved to Trash)
+  syncMeetingCalendarFields_('39f2d514-fe3a-81d4-8983-ec64bf3c29bc'); // "Plan: Gathering Place Ethno" — only Megan is an attendee
   Logger.log('debugTestSyncMeetingCalendarFields: done');
 }
 
