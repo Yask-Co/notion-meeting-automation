@@ -41,6 +41,15 @@ function debugTestExtractActionItems() {
 }
 
 /**
+ * Zero-argument wrapper chaining extractActionItems() -> createTaskPages()
+ * against the known test meeting, so the Run button can exercise Phase 4.
+ */
+function debugTestCreateTaskPages() {
+  var actionItems = extractActionItems('39f2d514-fe3a-808c-9ca2-d4a0e94b22ee');
+  createTaskPages(actionItems);
+}
+
+/**
  * Dumps the raw block children of a meeting note's summary block, so we
  * can see exactly how Notion stores the "### Action Items" markdown text
  * (literal text in a paragraph vs. native heading/to_do blocks) before
