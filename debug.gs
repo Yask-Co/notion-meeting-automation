@@ -66,8 +66,7 @@ function debugTestCreateDailySummaryPage() {
  * duplicate task pages).
  */
 function debugTestSetMeetingDate() {
-  setMeetingDate_('39f2d514-fe3a-808c-9ca2-d4a0e94b22ee'); // "test block"
-  setMeetingDate_('39f2d514-fe3a-8000-b026-eb5535694149'); // "Plan: GGP ethno"
+  setMeetingDate_('39f2d514-fe3a-8000-b026-eb5535694149'); // "Plan: GGP ethno" ("test block" was moved to Trash)
   Logger.log('debugTestSetMeetingDate: done');
 }
 
