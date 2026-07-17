@@ -19,8 +19,7 @@ function fetchNewMeetings() {
       filter: {
         property: 'Created on',
         created_time: { after: since }
-      },
-      sorts: [{ property: 'Created on', direction: 'ascending' }]
+      }
     };
     if (cursor) payload.start_cursor = cursor;
 
