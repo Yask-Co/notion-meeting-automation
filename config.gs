@@ -74,12 +74,15 @@ function getTranscriptionBlock_(pageId) {
 }
 
 // Returns the raw block children of a meeting's summary_block_id, or null
-// if the page has no meeting notes.
+// if the page has no meeting notes or its notes never finished processing
+// (no summary_block_id yet — e.g. "no usable meeting notes captured").
 function getMeetingSummaryBlocks_(pageId) {
   var transcriptionBlock = getTranscriptionBlock_(pageId);
-  if (!transcriptionBlock) return null;
+  var summaryBlockId = transcriptionBlock && transcriptionBlock.transcription.children
+    && transcriptionBlock.transcription.children.summary_block_id;
+  if (!summaryBlockId) return null;
 
-  return notionGetAllChildren(transcriptionBlock.transcription.children.summary_block_id);
+  return notionGetAllChildren(summaryBlockId);
 }
 
 // Extracts the plain-text title from a Notion page object's title property.
