@@ -1,6 +1,8 @@
 /**
- * Phase 1 — Query the Meetings database for any pages created in the last 24 hours.
- * Returns an array of Notion page objects.
+ * Phase 1 — Query the Meetings database for meetings that actually took
+ * place today (by calendar_event.start_time — the real meeting time, not
+ * when the Notion page happened to be created). Returns an array of
+ * Notion page objects.
  *
  * Run this function directly in the Apps Script editor to verify it finds
  * your recent meeting pages before moving to phase 2.
@@ -8,13 +10,12 @@
 function fetchNewMeetings() {
   Logger.log('fetchNewMeetings: start');
 
-  var sinceMs = Date.now() - 24 * 60 * 60 * 1000;
-  Logger.log('fetchNewMeetings: looking for meetings created after ' + new Date(sinceMs).toISOString());
+  var todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  var todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  // Filtered/sorted client-side on each page's built-in created_time rather
-  // than a named "Created on" property — that property can be renamed or
-  // deleted from the visible schema (as happened here), but created_time is
-  // intrinsic to every Notion page and always present.
+  Logger.log('fetchNewMeetings: looking for meetings that took place on ' + todayStart.toDateString());
+
   var allMeetings = [];
   var cursor = null;
 
@@ -26,8 +27,16 @@ function fetchNewMeetings() {
     cursor = result.has_more ? result.next_cursor : null;
   } while (cursor);
 
+  // Filtered on the meeting's actual date, not page creation time — those
+  // diverge whenever Notion Calendar bulk-syncs/backfills notes, which
+  // would otherwise make old meetings look "new."
   var meetings = allMeetings.filter(function(m) {
-    return new Date(m.created_time).getTime() > sinceMs;
+    var transcriptionBlock = getTranscriptionBlock_(m.id);
+    var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
+    if (!calendarEvent) return false;
+
+    var meetingTime = new Date(calendarEvent.start_time).getTime();
+    return meetingTime >= todayStart.getTime() && meetingTime < todayEnd.getTime();
   });
 
   Logger.log('fetchNewMeetings: found ' + meetings.length + ' meeting(s)');
