@@ -89,6 +89,38 @@ function debugCatchUpGenuinelyNewMeetings() {
 }
 
 /**
+ * One-off: the 2026-07-16/17 catch-up run already created 12 real task
+ * pages for "Andolini's x Yask Discovery" before crashing on the summary
+ * page step (toCreatableBlock_ bug, since fixed). This finishes just the
+ * summary page using those already-created task IDs, so the tasks aren't
+ * duplicated by re-running the full catch-up.
+ */
+function debugFinishCatchUpSummaryOnly() {
+  var meetingIds = [
+    '3a02d514-fe3a-80e7-875c-e826c704163e',
+    '3a02d514-fe3a-80ae-a31b-ef3b7316504a',
+    '39f2d514-fe3a-8093-957c-c2195413f14f',
+    '39f2d514-fe3a-805e-87b8-c764dcf9a340'
+  ];
+  var taskIds = [
+    '3a02d514-fe3a-81c8-aec2-d166f86d1932',
+    '3a02d514-fe3a-81f3-addf-ee7032aefecd',
+    '3a02d514-fe3a-81a4-8c16-ee9ec33d2017',
+    '3a02d514-fe3a-8192-9d75-c31b575d30df',
+    '3a02d514-fe3a-819e-b0f5-f0fd73dd8fb4',
+    '3a02d514-fe3a-818a-aef9-fe008d766a55',
+    '3a02d514-fe3a-8109-97f2-cd3f2a8dee2c',
+    '3a02d514-fe3a-816a-b113-d1fbacfb7c4b',
+    '3a02d514-fe3a-81fc-872a-d5eb47f043de',
+    '3a02d514-fe3a-81c8-82a5-de0c3580f664',
+    '3a02d514-fe3a-811c-b8e7-f0c1ad5b2923',
+    '3a02d514-fe3a-81ed-9b56-f001e4e6db13'
+  ];
+
+  createDailySummaryPage(meetingIds, taskIds);
+}
+
+/**
  * Removes any existing runDailyJob triggers (e.g. a stale one installed
  * at the wrong hour), so installDailyTrigger() can be re-run cleanly to
  * install the current schedule.
