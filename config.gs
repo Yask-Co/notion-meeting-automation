@@ -95,10 +95,19 @@ function pageTitle_(page) {
 }
 
 // Strips a fetched block down to the minimal shape Notion's block-creation
-// API accepts (type + that type's own data), dropping ids/timestamps/etc.
+// API accepts. Fetched blocks include read-only/derived fields (e.g.
+// numbered_list_item's "list_format") that the create endpoint rejects, so
+// this copies only known-safe fields rather than the whole type-specific
+// object verbatim.
 function toCreatableBlock_(block) {
+  var data = block[block.type];
+  var safeData = { rich_text: data.rich_text };
+  if (data.color !== undefined) safeData.color = data.color;
+  if (data.checked !== undefined) safeData.checked = data.checked;
+  if (data.is_toggleable !== undefined) safeData.is_toggleable = data.is_toggleable;
+
   var creatable = { type: block.type };
-  creatable[block.type] = block[block.type];
+  creatable[block.type] = safeData;
   return creatable;
 }
 
