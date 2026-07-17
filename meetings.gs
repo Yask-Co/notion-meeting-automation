@@ -8,26 +8,27 @@
 function fetchNewMeetings() {
   Logger.log('fetchNewMeetings: start');
 
-  var since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  Logger.log('fetchNewMeetings: looking for meetings created after ' + since);
+  var sinceMs = Date.now() - 24 * 60 * 60 * 1000;
+  Logger.log('fetchNewMeetings: looking for meetings created after ' + new Date(sinceMs).toISOString());
 
-  var meetings = [];
-  var cursor   = null;
+  // Filtered/sorted client-side on each page's built-in created_time rather
+  // than a named "Created on" property — that property can be renamed or
+  // deleted from the visible schema (as happened here), but created_time is
+  // intrinsic to every Notion page and always present.
+  var allMeetings = [];
+  var cursor = null;
 
   do {
-    var payload = {
-      filter: {
-        property: 'Created on',
-        created_time: { after: since }
-      }
-    };
-    if (cursor) payload.start_cursor = cursor;
+    var payload = cursor ? { start_cursor: cursor } : {};
+    var result  = notionPost('/data_sources/' + MEETINGS_DB_ID + '/query', payload);
 
-    var result = notionPost('/data_sources/' + MEETINGS_DB_ID + '/query', payload);
-
-    meetings = meetings.concat(result.results || []);
-    cursor   = result.has_more ? result.next_cursor : null;
+    allMeetings = allMeetings.concat(result.results || []);
+    cursor = result.has_more ? result.next_cursor : null;
   } while (cursor);
+
+  var meetings = allMeetings.filter(function(m) {
+    return new Date(m.created_time).getTime() > sinceMs;
+  });
 
   Logger.log('fetchNewMeetings: found ' + meetings.length + ' meeting(s)');
 
