@@ -14,6 +14,16 @@ function runDailyJob() {
     return;
   }
 
+  processMeetings_(meetings);
+}
+
+/**
+ * Runs the extract/create-tasks/create-summary pipeline for a given list
+ * of meeting page objects (as returned by fetchNewMeetings() or a manual
+ * Notion query) — factored out so a subset of meetings can be processed
+ * directly without going through fetchNewMeetings()'s 24-hour window.
+ */
+function processMeetings_(meetings) {
   var meetingIds = meetings.map(function(m) { return m.id; });
 
   var taskPages = [];
@@ -32,7 +42,8 @@ function runDailyJob() {
 
   var summaryPage = createDailySummaryPage(meetingIds, taskIds);
 
-  Logger.log('runDailyJob: complete — summary page ' + summaryPage.url);
+  Logger.log('processMeetings_: complete — summary page ' + summaryPage.url);
+  return summaryPage;
 }
 
 /**

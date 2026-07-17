@@ -71,6 +71,24 @@ function debugTestSyncMeetingCalendarFields() {
 }
 
 /**
+ * One-off catch-up run: processes only the 4 genuinely new meetings from
+ * the 2026-07-16/17 backlog-migration incident, skipping the 13 stale
+ * historical meetings that got bulk-migrated into the Meetings database
+ * at the same time and would otherwise look "new" to fetchNewMeetings().
+ */
+function debugCatchUpGenuinelyNewMeetings() {
+  var meetingIds = [
+    '3a02d514-fe3a-80e7-875c-e826c704163e', // Andolini's x Yask Discovery
+    '3a02d514-fe3a-80ae-a31b-ef3b7316504a', // Yask x Andolini's Internal Follow-up
+    '39f2d514-fe3a-8093-957c-c2195413f14f', // Meghan + Megan 1:1
+    '39f2d514-fe3a-805e-87b8-c764dcf9a340'  // Plan: Moreau Brothers Meeting
+  ];
+
+  var meetings = meetingIds.map(function(id) { return notionGet('/pages/' + id); });
+  processMeetings_(meetings);
+}
+
+/**
  * Removes any existing runDailyJob triggers (e.g. a stale one installed
  * at the wrong hour), so installDailyTrigger() can be re-run cleanly to
  * install the current schedule.
