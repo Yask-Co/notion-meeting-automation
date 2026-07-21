@@ -1,14 +1,13 @@
 /**
  * Phase 6 — Orchestrates the full daily pipeline.
- * This is the function the time-based trigger will call.
- *
- * Run this function directly in the Apps Script editor to verify the
- * whole pipeline end-to-end before installing the daily trigger.
+ * This is the function the time-based trigger will call (with no
+ * arguments, so it always processes today). Pass a Date manually — e.g.
+ * runDailyJob(new Date('2026-07-20')) — to catch up on a missed prior day.
  */
-function runDailyJob() {
+function runDailyJob(targetDate) {
   Logger.log('runDailyJob: start');
 
-  var meetings = fetchNewMeetings();
+  var meetings = fetchNewMeetings(targetDate);
   if (meetings.length === 0) {
     Logger.log('runDailyJob: no new meetings found — nothing to do');
     return;
@@ -44,6 +43,21 @@ function processMeetings_(meetings) {
 
   Logger.log('processMeetings_: complete — summary page ' + summaryPage.url);
   return summaryPage;
+}
+
+/**
+ * Manual catch-up helper: runs the pipeline for whatever date is set in
+ * the CATCHUP_DATE Script Property (format: yyyy-MM-dd, e.g. 2026-07-20).
+ * Use this instead of editing code when you need to catch up on a missed
+ * day — set the property, click Run on this function, no code changes
+ * needed. Update CATCHUP_DATE and re-run for a different day.
+ */
+function runCatchUpForConfiguredDate() {
+  var dateStr = PropertiesService.getScriptProperties().getProperty('CATCHUP_DATE');
+  if (!dateStr) throw new Error('CATCHUP_DATE not set in Script Properties — set it to a date like 2026-07-20 first');
+
+  Logger.log('runCatchUpForConfiguredDate: catching up on ' + dateStr);
+  runDailyJob(new Date(dateStr));
 }
 
 /**

@@ -1,20 +1,21 @@
 /**
  * Phase 1 — Query the Meetings database for meetings that actually took
- * place today (by calendar_event.start_time — the real meeting time, not
- * when the Notion page happened to be created). Returns an array of
- * Notion page objects.
+ * place on targetDate (by calendar_event.start_time — the real meeting
+ * time, not when the Notion page happened to be created). Defaults to
+ * today if targetDate is omitted; pass e.g. new Date('2026-07-20') to
+ * catch up on a missed prior day. Returns an array of Notion page objects.
  *
  * Run this function directly in the Apps Script editor to verify it finds
  * your recent meeting pages before moving to phase 2.
  */
-function fetchNewMeetings() {
+function fetchNewMeetings(targetDate) {
   Logger.log('fetchNewMeetings: start');
 
-  var todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  var todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+  var dayStart = targetDate ? new Date(targetDate) : new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  var dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  Logger.log('fetchNewMeetings: looking for meetings that took place on ' + todayStart.toDateString());
+  Logger.log('fetchNewMeetings: looking for meetings that took place on ' + dayStart.toDateString());
 
   var allMeetings = [];
   var cursor = null;
@@ -34,7 +35,7 @@ function fetchNewMeetings() {
   // grows — this is what caused a run to exceed Apps Script's execution
   // time limit. 3 days comfortably covers any Calendar backfill delay
   // while keeping the candidate set small under normal daily use.
-  var recentCutoffMs = todayStart.getTime() - 3 * 24 * 60 * 60 * 1000;
+  var recentCutoffMs = dayStart.getTime() - 3 * 24 * 60 * 60 * 1000;
   var candidates = allMeetings.filter(function(m) {
     return new Date(m.created_time).getTime() > recentCutoffMs;
   });
@@ -48,7 +49,7 @@ function fetchNewMeetings() {
     if (!calendarEvent) return false;
 
     var meetingTime = new Date(calendarEvent.start_time).getTime();
-    return meetingTime >= todayStart.getTime() && meetingTime < todayEnd.getTime();
+    return meetingTime >= dayStart.getTime() && meetingTime < dayEnd.getTime();
   });
 
   Logger.log('fetchNewMeetings: found ' + meetings.length + ' meeting(s)');
