@@ -121,6 +121,40 @@ function debugFinishCatchUpSummaryOnly() {
 }
 
 /**
+ * One-off: the 2026-07-20 catch-up run already created 15 real task pages
+ * across 3 meetings before crashing on the summary page step (100-block
+ * limit, since fixed). This finishes just the summary page using those
+ * already-created task IDs, so the tasks aren't duplicated by re-running
+ * the full catch-up.
+ */
+function debugFinishJuly20SummaryOnly() {
+  var meetingIds = [
+    '3a32d514-fe3a-8162-95ef-e113427427f3', // Yask 90 Day OKR Session
+    '3a32d514-fe3a-80a6-9efb-e2779d359c41', // Gearhead Demo Debrief
+    '3a32d514-fe3a-805c-b237-de6754a1237e'  // Gearhead Discovery Call YASK
+  ];
+  var taskIds = [
+    '3a42d514-fe3a-8125-84f6-d4100ececdc1',
+    '3a42d514-fe3a-814a-8426-c3aa956edc77',
+    '3a42d514-fe3a-811e-ab5a-efd4d7927d5a',
+    '3a42d514-fe3a-8101-adf6-e0ac5ff70fee',
+    '3a42d514-fe3a-81da-87c3-c9a3fb40108a',
+    '3a42d514-fe3a-81f8-a9bc-c9f2f9012d86',
+    '3a42d514-fe3a-8142-a834-e1fd6a599b53',
+    '3a42d514-fe3a-81a8-851d-d03248050214',
+    '3a42d514-fe3a-8117-998d-f9d69360856d',
+    '3a42d514-fe3a-8142-9057-ea002d54379b',
+    '3a42d514-fe3a-817c-94ac-ec94d7bd30ed',
+    '3a42d514-fe3a-81d2-8aed-e55bdabf8b94',
+    '3a42d514-fe3a-812d-a1c4-ef1feaf33f9c',
+    '3a42d514-fe3a-81f4-b4f4-ff42e9e763d0',
+    '3a42d514-fe3a-8142-a6df-d0daa901689d'
+  ];
+
+  createDailySummaryPage(meetingIds, taskIds);
+}
+
+/**
  * Removes any existing runDailyJob triggers (e.g. a stale one installed
  * at the wrong hour), so installDailyTrigger() can be re-run cleanly to
  * install the current schedule.
