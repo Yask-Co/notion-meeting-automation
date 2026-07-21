@@ -56,8 +56,14 @@ function runCatchUpForConfiguredDate() {
   var dateStr = PropertiesService.getScriptProperties().getProperty('CATCHUP_DATE');
   if (!dateStr) throw new Error('CATCHUP_DATE not set in Script Properties — set it to a date like 2026-07-20 first');
 
+  // A bare "yyyy-MM-dd" string is parsed as midnight UTC by new Date(), which
+  // lands on the wrong calendar day once shifted to the script's local
+  // timezone. Parsing the components explicitly avoids that off-by-one-day bug.
+  var parts = dateStr.split('-').map(Number);
+  var targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
+
   Logger.log('runCatchUpForConfiguredDate: catching up on ' + dateStr);
-  runDailyJob(new Date(dateStr));
+  runDailyJob(targetDate);
 }
 
 /**
