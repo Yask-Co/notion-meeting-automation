@@ -38,7 +38,7 @@ function createTaskPages(actionItems, projectId, meetingId) {
   var createdPages = actionItems.map(function(text) {
     var properties = {
       'Name': { title: [{ text: { content: text } }] },
-      'Status': { status: { name: 'Not started' } }
+      'Planning': { status: { name: 'Not started' } }
     };
     if (projectId) {
       properties['Project'] = { relation: [{ id: projectId }] };
