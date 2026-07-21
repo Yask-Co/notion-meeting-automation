@@ -27,10 +27,22 @@ function fetchNewMeetings() {
     cursor = result.has_more ? result.next_cursor : null;
   } while (cursor);
 
+  // Cheap pre-filter on each page's built-in created_time (already in hand,
+  // no extra API call) to a generous recent window, BEFORE the expensive
+  // per-meeting block fetch below. Without this, checking every historical
+  // meeting's blocks on every run gets slower forever as the database
+  // grows — this is what caused a run to exceed Apps Script's execution
+  // time limit. 3 days comfortably covers any Calendar backfill delay
+  // while keeping the candidate set small under normal daily use.
+  var recentCutoffMs = todayStart.getTime() - 3 * 24 * 60 * 60 * 1000;
+  var candidates = allMeetings.filter(function(m) {
+    return new Date(m.created_time).getTime() > recentCutoffMs;
+  });
+
   // Filtered on the meeting's actual date, not page creation time — those
   // diverge whenever Notion Calendar bulk-syncs/backfills notes, which
   // would otherwise make old meetings look "new."
-  var meetings = allMeetings.filter(function(m) {
+  var meetings = candidates.filter(function(m) {
     var transcriptionBlock = getTranscriptionBlock_(m.id);
     var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
     if (!calendarEvent) return false;
