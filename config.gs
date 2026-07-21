@@ -123,3 +123,13 @@ function linkBulletBlock_(text, url) {
     bulleted_list_item: { rich_text: [{ text: { content: text, link: { url: url } } }] }
   };
 }
+
+// Appends blocks to a page/block's children in batches of 100 — Notion
+// rejects more than 100 children in a single request, whether creating or
+// appending.
+function appendBlocksInBatches_(parentId, blocks) {
+  var batchSize = 100;
+  for (var i = 0; i < blocks.length; i += batchSize) {
+    notionPatch('/blocks/' + parentId + '/children', { children: blocks.slice(i, i + batchSize) });
+  }
+}

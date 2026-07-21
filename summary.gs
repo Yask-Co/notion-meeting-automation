@@ -71,6 +71,8 @@ function createDailySummaryPage(meetingIds, taskIds) {
     });
   });
 
+  // Page creation only accepts up to 100 children in one call — create the
+  // page with just properties, then append all the body content in batches.
   var summaryPage = notionPost('/pages', {
     parent: { type: 'data_source_id', data_source_id: getSummaryDbId() },
     properties: {
@@ -79,9 +81,10 @@ function createDailySummaryPage(meetingIds, taskIds) {
       'Type': { select: { name: 'Daily' } },
       'Meetings': { relation: meetingIds.map(function(id) { return { id: id }; }) },
       'Tasks Created': { relation: taskIds.map(function(id) { return { id: id }; }) }
-    },
-    children: children
+    }
   });
+
+  appendBlocksInBatches_(summaryPage.id, children);
 
   Logger.log('createDailySummaryPage: created — ' + summaryPage.url);
   return summaryPage;
