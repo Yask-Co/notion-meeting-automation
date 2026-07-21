@@ -37,8 +37,24 @@ function notionRequest_(method, path, payload) {
   };
   if (payload) options.payload = JSON.stringify(payload);
 
-  var response = UrlFetchApp.fetch(NOTION_BASE_URL + path, options);
-  var body = JSON.parse(response.getContentText());
+  var maxRetries = 3;
+  var response, statusCode;
+
+  for (var attempt = 0; attempt <= maxRetries; attempt++) {
+    response = UrlFetchApp.fetch(NOTION_BASE_URL + path, options);
+    statusCode = response.getResponseCode();
+
+    if (statusCode !== 429 || attempt === maxRetries) break;
+    Utilities.sleep(1000 * Math.pow(2, attempt)); // back off 1s, 2s, 4s on rate limiting
+  }
+
+  var text = response.getContentText();
+  var body;
+  try {
+    body = JSON.parse(text);
+  } catch (e) {
+    throw new Error('Notion API returned a non-JSON response [' + statusCode + ']: ' + text.substring(0, 300) + ' (path=' + path + ')');
+  }
 
   if (body.object === 'error') {
     throw new Error('Notion API error [' + body.status + ']: ' + body.message + ' (path=' + path + ')');
@@ -98,13 +114,19 @@ function pageTitle_(page) {
 // API accepts. Fetched blocks include read-only/derived fields (e.g.
 // numbered_list_item's "list_format") that the create endpoint rejects, so
 // this copies only known-safe fields rather than the whole type-specific
-// object verbatim.
+// object verbatim. Recurses into has_children blocks (e.g. nested
+// sub-bullets) so nested content isn't silently dropped.
 function toCreatableBlock_(block) {
   var data = block[block.type];
   var safeData = { rich_text: data.rich_text };
   if (data.color !== undefined) safeData.color = data.color;
   if (data.checked !== undefined) safeData.checked = data.checked;
   if (data.is_toggleable !== undefined) safeData.is_toggleable = data.is_toggleable;
+  if (data.language !== undefined) safeData.language = data.language; // required field for code blocks
+
+  if (block.has_children) {
+    safeData.children = notionGetAllChildren(block.id).map(toCreatableBlock_);
+  }
 
   var creatable = { type: block.type };
   creatable[block.type] = safeData;

@@ -68,18 +68,16 @@ function runCatchUpForConfiguredDate() {
 
 /**
  * Phase 7 — One-time setup: installs a daily time-based trigger for
- * runDailyJob() at 8 PM (script timezone). Safe to run more than once;
- * will not create duplicate triggers.
+ * runDailyJob() at 8 PM (script timezone). Safe to run more than once —
+ * replaces any existing runDailyJob trigger(s) first, so it always
+ * converges on the current schedule below rather than silently leaving a
+ * stale trigger in place if this function's schedule is ever changed.
  */
 function installDailyTrigger() {
-  var alreadyInstalled = ScriptApp.getProjectTriggers().some(function(trigger) {
+  var existing = ScriptApp.getProjectTriggers().filter(function(trigger) {
     return trigger.getHandlerFunction() === 'runDailyJob';
   });
-
-  if (alreadyInstalled) {
-    Logger.log('installDailyTrigger: trigger already exists — skipping');
-    return;
-  }
+  existing.forEach(function(trigger) { ScriptApp.deleteTrigger(trigger); });
 
   ScriptApp.newTrigger('runDailyJob')
     .timeBased()
@@ -87,5 +85,6 @@ function installDailyTrigger() {
     .everyDays(1)
     .create();
 
-  Logger.log('installDailyTrigger: daily trigger installed for 8 PM');
+  Logger.log('installDailyTrigger: daily trigger installed for 8 PM' +
+    (existing.length ? ' (replaced ' + existing.length + ' existing trigger(s))' : ''));
 }

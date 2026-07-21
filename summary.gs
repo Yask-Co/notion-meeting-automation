@@ -52,20 +52,22 @@ function createDailySummaryPage(meetingIds, taskIds) {
   var todayLabel = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy');
   var todayIso   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
+  // Fetched once per meeting and reused below, rather than fetching each
+  // meeting page twice (once per section).
+  var meetingPages = meetingIds.map(function(meetingId) { return notionGet('/pages/' + meetingId); });
+
   var children = [];
 
   children.push(headingBlock_(2, 'Meetings'));
-  meetingIds.forEach(function(meetingId) {
-    var page = notionGet('/pages/' + meetingId);
+  meetingPages.forEach(function(page) {
     children.push(linkBulletBlock_(pageTitle_(page), page.url));
   });
 
   children.push(headingBlock_(2, 'Meeting Notes'));
-  meetingIds.forEach(function(meetingId) {
-    var page = notionGet('/pages/' + meetingId);
+  meetingPages.forEach(function(page) {
     children.push(headingBlock_(3, pageTitle_(page)));
 
-    var summaryBlocks = getMeetingSummaryBlocks_(meetingId) || [];
+    var summaryBlocks = getMeetingSummaryBlocks_(page.id) || [];
     summaryBlocks.forEach(function(block) {
       children.push(toCreatableBlock_(block));
     });
