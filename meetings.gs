@@ -11,7 +11,12 @@
 function fetchNewMeetings(targetDate) {
   Logger.log('fetchNewMeetings: start');
 
-  var dayStart = targetDate ? new Date(targetDate) : new Date();
+  // Time-based triggers call their handler with an event object (year/month/
+  // day/etc.) as the argument, not zero args — checking truthiness alone
+  // treated that event object as a real targetDate, producing an Invalid
+  // Date and silently zeroing out every automatic run. Only a genuine Date
+  // instance (e.g. from runCatchUpForConfiguredDate()) should override "today".
+  var dayStart = (targetDate instanceof Date) ? new Date(targetDate) : new Date();
   dayStart.setHours(0, 0, 0, 0);
   var dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
