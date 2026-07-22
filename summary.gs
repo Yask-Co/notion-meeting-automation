@@ -66,12 +66,15 @@ function createDailySummaryPage(meetingIds, taskIds, targetDate) {
 
   children.push(headingBlock_(2, 'Meetings'));
   meetingPages.forEach(function(page) {
-    children.push(linkBulletBlock_(pageTitle_(page), page.url));
+    children.push(meetingSummaryBulletBlock_(page));
   });
 
   children.push(headingBlock_(2, 'Meeting Notes'));
   meetingPages.forEach(function(page) {
     children.push(headingBlock_(3, pageTitle_(page)));
+
+    var metaBlock = meetingMetaParagraphBlock_(page);
+    if (metaBlock) children.push(metaBlock);
 
     var summaryBlocks = getMeetingSummaryBlocks_(page.id) || [];
     summaryBlocks.forEach(function(block) {

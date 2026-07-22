@@ -146,6 +146,69 @@ function linkBulletBlock_(text, url) {
   };
 }
 
+// Formats a meeting page's "Meeting Date" property (set by
+// syncMeetingCalendarFields_() from the matching Google Calendar event)
+// as a human-readable date + time, or null if it was never synced (e.g.
+// no matching calendar event was found).
+function meetingDateTimeLabel_(page) {
+  var dateProp = page.properties['Meeting Date'];
+  var start = dateProp && dateProp.date && dateProp.date.start;
+  if (!start) return null;
+
+  return Utilities.formatDate(new Date(start), Session.getScriptTimeZone(), 'MMM d, yyyy, h:mm a');
+}
+
+// Formats a meeting page's "Attendee Names" property (set by
+// syncMeetingCalendarFields_() from the matching Google Calendar event's
+// guest list) as a comma-separated string, or null if empty/never synced.
+function attendeeNamesLabel_(page) {
+  var namesProp = page.properties['Attendee Names'];
+  var options = namesProp && namesProp.multi_select;
+  if (!options || options.length === 0) return null;
+
+  return options.map(function(o) { return o.name; }).join(', ');
+}
+
+// Joins whichever of date/time and attendees are available into a single
+// "Jul 21, 2026, 2:00 PM  •  Attendees: a@x.com, b@y.com" string, or null
+// if the meeting page has neither (e.g. syncMeetingCalendarFields_()
+// never found a matching calendar event for it).
+function meetingMetaLabel_(page) {
+  var parts = [];
+  var dateTimeLabel = meetingDateTimeLabel_(page);
+  var attendeesLabel = attendeeNamesLabel_(page);
+  if (dateTimeLabel) parts.push(dateTimeLabel);
+  if (attendeesLabel) parts.push('Attendees: ' + attendeesLabel);
+
+  return parts.length > 0 ? parts.join('  •  ') : null;
+}
+
+// Bulleted list item for the summary page's "Meetings" section: the
+// meeting's linked title, plus its date/time and attendees inline when
+// available.
+function meetingSummaryBulletBlock_(page) {
+  var richText = [{ text: { content: pageTitle_(page), link: { url: page.url } } }];
+
+  var metaLabel = meetingMetaLabel_(page);
+  if (metaLabel) richText.push({ text: { content: '  —  ' + metaLabel } });
+
+  return { type: 'bulleted_list_item', bulleted_list_item: { rich_text: richText } };
+}
+
+// Grayed-out italic paragraph for the summary page's "Meeting Notes"
+// section, placed under each meeting's heading — shows date/time and
+// attendees, or returns null (so no empty paragraph is inserted) if
+// neither is available.
+function meetingMetaParagraphBlock_(page) {
+  var metaLabel = meetingMetaLabel_(page);
+  if (!metaLabel) return null;
+
+  return {
+    type: 'paragraph',
+    paragraph: { rich_text: [{ text: { content: metaLabel }, annotations: { italic: true, color: 'gray' } }] }
+  };
+}
+
 // Appends blocks to a page/block's children in batches of 100 — Notion
 // rejects more than 100 children in a single request, whether creating or
 // appending.
