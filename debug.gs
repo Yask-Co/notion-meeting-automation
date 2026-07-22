@@ -33,6 +33,42 @@ function debugWhoAmI() {
 }
 
 /**
+ * Diagnostic for the "no matching Calendar event found" failures seen
+ * across every single meeting in backfillMeetingCalendarFields() — a
+ * 100% failure rate, which points at CalendarApp.getDefaultCalendar()
+ * resolving to the wrong calendar entirely (e.g. a personal calendar,
+ * when the actual meetings live on a separate/shared calendar) rather
+ * than a per-meeting matching issue. Logs which calendar is "default",
+ * every other calendar this account can see, and every event that
+ * actually exists on the default calendar in the window where the
+ * missing meetings should be — so we can tell at a glance whether the
+ * default calendar is simply empty (wrong account/calendar) or has
+ * events with different times/titles than expected (a different bug).
+ */
+function debugInspectDefaultCalendar() {
+  var defaultCal = CalendarApp.getDefaultCalendar();
+  Logger.log('debugInspectDefaultCalendar: default calendar — id=' + defaultCal.getId() +
+    '  name="' + defaultCal.getName() + '"');
+
+  var allCalendars = CalendarApp.getAllCalendars();
+  Logger.log('debugInspectDefaultCalendar: ' + allCalendars.length + ' calendar(s) accessible to this account total:');
+  allCalendars.forEach(function(cal) {
+    Logger.log('  id=' + cal.getId() + '  name="' + cal.getName() + '"');
+  });
+
+  // Wide window covering every meeting backfillMeetingCalendarFields()
+  // just failed to match (2026-07-07 through 2026-07-22).
+  var start = new Date(2026, 6, 6);
+  var end   = new Date(2026, 6, 23);
+  var events = defaultCal.getEvents(start, end);
+  Logger.log('debugInspectDefaultCalendar: ' + events.length +
+    ' event(s) found on the DEFAULT calendar between ' + start + ' and ' + end + ':');
+  events.forEach(function(e) {
+    Logger.log('  "' + e.getTitle() + '"  ' + e.getStartTime() + ' – ' + e.getEndTime());
+  });
+}
+
+/**
  * Zero-argument wrapper so the Apps Script editor's Run button can
  * exercise extractActionItems() against the known test meeting.
  */
