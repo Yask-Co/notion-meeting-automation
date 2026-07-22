@@ -6,6 +6,16 @@ var NOTION_BASE_URL    = 'https://api.notion.com/v1';
 var MEETINGS_DB_ID = '39b2d514-fe3a-803d-b5bb-000bc511b02f';
 var TASKS_DB_ID    = '39b2d514-fe3a-809f-87ad-000bfb8b7851';
 
+// The calendar the actual meetings live on — a separate Google Workspace
+// account/calendar from whichever account authorizes/runs this script.
+// CalendarApp.getDefaultCalendar() would return the running account's OWN
+// calendar instead, which is why every event lookup previously failed
+// (confirmed via debugInspectDefaultCalendar()). This calendar must be
+// shared with the script's running account (at least "See all event
+// details", so guest lists are visible) for CalendarApp.getCalendarById()
+// to succeed.
+var MEETINGS_CALENDAR_ID = 'megan@yask.co';
+
 // Page shared with the integration to hold the Summary database (setupSummaryDatabase() creates it as a child of this page).
 var SUMMARY_PARENT_PAGE_ID = '39f2d514-fe3a-80cf-8008-fdb0ef4ab43f';
 

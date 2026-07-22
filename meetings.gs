@@ -100,16 +100,15 @@ function addMeetingDatePropertyToMeetings() {
  * event is found.
  */
 function getGoogleCalendarAttendeeEmails_(startTime, endTime) {
-  var events = CalendarApp.getDefaultCalendar().getEvents(new Date(startTime), new Date(endTime));
+  var events = CalendarApp.getCalendarById(MEETINGS_CALENDAR_ID).getEvents(new Date(startTime), new Date(endTime));
   if (events.length === 0) {
     Logger.log('getGoogleCalendarAttendeeEmails_: no matching Calendar event found for ' + startTime + ' – ' + endTime);
     return [];
   }
 
   // getGuestList() excludes the event's owner/organizer unless includeOwner
-  // is explicitly true — without this, every meeting organized by the
-  // calendar this script runs under (getDefaultCalendar()) silently drops
-  // its own organizer from Attendee Names.
+  // is explicitly true — without this, every meeting organized by
+  // MEETINGS_CALENDAR_ID's own owner silently drops them from Attendee Names.
   return events[0].getGuestList(true).map(function(guest) { return guest.getEmail(); });
 }
 

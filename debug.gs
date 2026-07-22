@@ -69,6 +69,34 @@ function debugInspectDefaultCalendar() {
 }
 
 /**
+ * Verifies the script's running account can actually access
+ * MEETINGS_CALENDAR_ID. getCalendarById() returns null (not an
+ * exception) if that calendar hasn't been shared with the running
+ * account, or shared with too low a permission level to see event
+ * details/guests — run this after setting up calendar sharing to
+ * confirm it actually worked before relying on it in production.
+ */
+function debugVerifyMeetingsCalendarAccess() {
+  var cal = CalendarApp.getCalendarById(MEETINGS_CALENDAR_ID);
+  if (!cal) {
+    Logger.log('debugVerifyMeetingsCalendarAccess: getCalendarById(' + MEETINGS_CALENDAR_ID + ') returned null — ' +
+      'not shared with this account, or the calendar ID is wrong.');
+    return;
+  }
+
+  Logger.log('debugVerifyMeetingsCalendarAccess: accessible — name="' + cal.getName() + '"');
+
+  var start = new Date(2026, 6, 6);
+  var end   = new Date(2026, 6, 23);
+  var events = cal.getEvents(start, end);
+  Logger.log('debugVerifyMeetingsCalendarAccess: ' + events.length + ' event(s) found between ' + start + ' and ' + end + ':');
+  events.forEach(function(e) {
+    var guests = e.getGuestList(true).map(function(g) { return g.getEmail(); });
+    Logger.log('  "' + e.getTitle() + '"  ' + e.getStartTime() + ' – ' + e.getEndTime() + '  guests=' + guests.join(', '));
+  });
+}
+
+/**
  * Zero-argument wrapper so the Apps Script editor's Run button can
  * exercise extractActionItems() against the known test meeting.
  */
