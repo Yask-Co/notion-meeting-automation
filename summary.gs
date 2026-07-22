@@ -58,18 +58,22 @@ function createDailySummaryPage(meetingIds, taskIds, targetDate) {
   var todayLabel = Utilities.formatDate(labelDate, Session.getScriptTimeZone(), 'MMMM d, yyyy');
   var todayIso   = Utilities.formatDate(labelDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-  // Fetched once per meeting and reused below, rather than fetching each
-  // meeting page twice (once per section).
+  // Fetched once per meeting/task and reused below, rather than
+  // refetching per section.
   var meetingPages = meetingIds.map(function(meetingId) { return notionGet('/pages/' + meetingId); });
+  var taskPages    = taskIds.map(function(taskId) { return notionGet('/pages/' + taskId); });
 
+  var meetingTitleById = {};
+  meetingPages.forEach(function(page) { meetingTitleById[page.id] = pageTitle_(page); });
+
+  // Ordered so the page reads front-to-back as: full meeting summaries,
+  // then a consolidated task list, then a quick reference list of
+  // meeting metadata — rather than the old meeting-by-meeting
+  // chronological dump with tasks not visible in the body at all
+  // (only present as the hidden "Tasks Created" relation property).
   var children = [];
 
-  children.push(headingBlock_(2, 'Meetings'));
-  meetingPages.forEach(function(page) {
-    children.push(meetingSummaryBulletBlock_(page));
-  });
-
-  children.push(headingBlock_(2, 'Meeting Notes'));
+  children.push(headingBlock_(2, 'Meeting Summaries'));
   meetingPages.forEach(function(page) {
     children.push(headingBlock_(3, pageTitle_(page)));
 
@@ -80,6 +84,20 @@ function createDailySummaryPage(meetingIds, taskIds, targetDate) {
     summaryBlocks.forEach(function(block) {
       children.push(toCreatableBlock_(block));
     });
+  });
+
+  children.push(headingBlock_(2, 'Tasks'));
+  if (taskPages.length === 0) {
+    children.push(noTasksParagraphBlock_());
+  } else {
+    taskPages.forEach(function(page) {
+      children.push(taskSummaryBulletBlock_(page, meetingTitleById));
+    });
+  }
+
+  children.push(headingBlock_(2, 'Meetings'));
+  meetingPages.forEach(function(page) {
+    children.push(meetingSummaryBulletBlock_(page));
   });
 
   // Page creation only accepts up to 100 children in one call — create the

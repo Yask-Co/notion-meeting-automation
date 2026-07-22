@@ -209,6 +209,32 @@ function meetingMetaParagraphBlock_(page) {
   };
 }
 
+// Bulleted list item for the summary page's consolidated "Tasks"
+// section: the task's linked title, plus which meeting it came from
+// (resolved via the task's own "Source Meeting" relation against
+// meetingTitleById — an id-\>title map built from the already-fetched
+// meeting pages, so this needs no extra API calls) when available.
+function taskSummaryBulletBlock_(taskPage, meetingTitleById) {
+  var richText = [{ text: { content: pageTitle_(taskPage), link: { url: taskPage.url } } }];
+
+  var sourceMeetingRelation = taskPage.properties['Source Meeting'] && taskPage.properties['Source Meeting'].relation;
+  var sourceMeetingId = (sourceMeetingRelation && sourceMeetingRelation.length > 0) ? sourceMeetingRelation[0].id : null;
+  var sourceMeetingTitle = sourceMeetingId && meetingTitleById[sourceMeetingId];
+  if (sourceMeetingTitle) richText.push({ text: { content: '  —  from ' + sourceMeetingTitle } });
+
+  return { type: 'bulleted_list_item', bulleted_list_item: { rich_text: richText } };
+}
+
+// Grayed-out italic paragraph shown in place of the "Tasks" section
+// when a day's meetings produced no action items, so the section isn't
+// just silently empty with no explanation.
+function noTasksParagraphBlock_() {
+  return {
+    type: 'paragraph',
+    paragraph: { rich_text: [{ text: { content: 'No action items found in today\u2019s meetings.' }, annotations: { italic: true, color: 'gray' } }] }
+  };
+}
+
 // Appends blocks to a page/block's children in batches of 100 — Notion
 // rejects more than 100 children in a single request, whether creating or
 // appending.
