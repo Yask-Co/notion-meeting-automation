@@ -103,7 +103,11 @@ function getGoogleCalendarAttendeeEmails_(startTime, endTime) {
   var events = CalendarApp.getDefaultCalendar().getEvents(new Date(startTime), new Date(endTime));
   if (events.length === 0) return [];
 
-  return events[0].getGuestList().map(function(guest) { return guest.getEmail(); });
+  // getGuestList() excludes the event's owner/organizer unless includeOwner
+  // is explicitly true — without this, every meeting organized by the
+  // calendar this script runs under (getDefaultCalendar()) silently drops
+  // its own organizer from Attendee Names.
+  return events[0].getGuestList(true).map(function(guest) { return guest.getEmail(); });
 }
 
 /**
