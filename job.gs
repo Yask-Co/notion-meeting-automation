@@ -7,13 +7,18 @@
 function runDailyJob(targetDate) {
   Logger.log('runDailyJob: start');
 
-  var meetings = fetchNewMeetings(targetDate);
+  // Same instanceof guard as fetchNewMeetings() — normalized once here so
+  // the resulting summary page is labeled with the actual day being
+  // processed (e.g. a catch-up run) instead of always "today".
+  var effectiveDate = (targetDate instanceof Date) ? targetDate : new Date();
+
+  var meetings = fetchNewMeetings(effectiveDate);
   if (meetings.length === 0) {
     Logger.log('runDailyJob: no new meetings found — nothing to do');
     return;
   }
 
-  processMeetings_(meetings);
+  processMeetings_(meetings, effectiveDate);
 }
 
 /**
@@ -21,8 +26,10 @@ function runDailyJob(targetDate) {
  * of meeting page objects (as returned by fetchNewMeetings() or a manual
  * Notion query) — factored out so a subset of meetings can be processed
  * directly without going through fetchNewMeetings()'s 24-hour window.
+ * targetDate labels the resulting summary page (defaults to today if
+ * omitted, e.g. when called from debug.gs's one-off historical helpers).
  */
-function processMeetings_(meetings) {
+function processMeetings_(meetings, targetDate) {
   var meetingIds = meetings.map(function(m) { return m.id; });
 
   var taskPages = [];
@@ -39,7 +46,7 @@ function processMeetings_(meetings) {
 
   var taskIds = taskPages.map(function(p) { return p.id; });
 
-  var summaryPage = createDailySummaryPage(meetingIds, taskIds);
+  var summaryPage = createDailySummaryPage(meetingIds, taskIds, targetDate);
 
   Logger.log('processMeetings_: complete — summary page ' + summaryPage.url);
   return summaryPage;

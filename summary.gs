@@ -38,19 +38,25 @@ function setupSummaryDatabase() {
 
 /**
  * Phase 5 — Create the daily summary page in the Summary database,
- * linking back to the meeting and task pages created today. Body content
- * (meeting list, full copied meeting notes, task list) is built directly
- * from meetingIds/taskIds — no separate summaryText input needed.
+ * linking back to the meeting and task pages created for targetDate
+ * (defaults to today if omitted — e.g. debug.gs's one-off historical
+ * helpers that don't pass it). Body content (meeting list, full copied
+ * meeting notes, task list) is built directly from meetingIds/taskIds —
+ * no separate summaryText input needed.
  *
  * Run this function directly in the Apps Script editor to verify it
  * creates a summary page before moving to phase 6.
  */
-function createDailySummaryPage(meetingIds, taskIds) {
+function createDailySummaryPage(meetingIds, taskIds, targetDate) {
   Logger.log('createDailySummaryPage: start — ' +
     meetingIds.length + ' meeting(s), ' + taskIds.length + ' task(s)');
 
-  var todayLabel = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy');
-  var todayIso   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  // Labels the page with the day actually being processed, not necessarily
+  // today — e.g. a catch-up run for a missed prior day should produce a
+  // summary titled/dated for that day, not the day the catch-up happened to run.
+  var labelDate = (targetDate instanceof Date) ? targetDate : new Date();
+  var todayLabel = Utilities.formatDate(labelDate, Session.getScriptTimeZone(), 'MMMM d, yyyy');
+  var todayIso   = Utilities.formatDate(labelDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
   // Fetched once per meeting and reused below, rather than fetching each
   // meeting page twice (once per section).
