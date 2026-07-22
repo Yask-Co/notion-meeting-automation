@@ -1,0 +1,24 @@
+{
+  "name": "notion-meeting-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Google Apps Script automation that turns Notion meeting notes into tasks and daily summaries",
+  "scripts": {
+    "clasp": "clasp",
+    "login": "clasp login",
+    "logout": "clasp logout",
+    "pull": "clasp pull",
+    "push": "clasp push --force",
+    "status": "clasp status",
+    "open": "clasp open-script",
+    "logs": "clasp logs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yask-Co/notion-meeting-automation.git"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@google/clasp": "^3.3.0"
+  }
+}
