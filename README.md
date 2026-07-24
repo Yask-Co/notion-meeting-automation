@@ -5,7 +5,8 @@ Google Apps Script project (managed with [clasp](https://github.com/google/clasp
 1. Find meetings that took place today
 2. Sync Meeting Date + Attendee Names from Google Calendar
 3. Extract Action Items into the Tasks database
-4. Create a Daily Summary page
+4. Create a Daily Summary page (Claude overview + tasks + meeting notes)
+5. Optionally roll up the week into a Weekly Summary (`runWeeklyJob`)
 
 ## Prerequisites
 
@@ -55,6 +56,7 @@ Or paste the JSON into Cursor / CI secrets as `CLASPRC_JSON`.
 
 In the Apps Script editor (after `npm run push` / `npm run open`):
 
-1. Set Script Properties: `NOTION_TOKEN`, `SUMMARY_DB_ID` (from `setupSummaryDatabase()`)
+1. Set Script Properties: `NOTION_TOKEN`, `SUMMARY_DB_ID` (from `setupSummaryDatabase()`), `ANTHROPIC_API_KEY`
 2. Run `installDailyTrigger()` once (8 PM, script timezone `America/Chicago`)
-3. Optional catch-up: set `CATCHUP_DATE` (`yyyy-MM-dd`) and run `runCatchUpForConfiguredDate()`
+3. Optional: run `installWeeklyTrigger()` for Saturday 8 PM weekly rollups
+4. Optional catch-up: set `CATCHUP_DATE` (`yyyy-MM-dd`) and run `runCatchUpForConfiguredDate()`

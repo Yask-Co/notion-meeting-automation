@@ -203,6 +203,45 @@ function headingBlock_(level, text) {
   return block;
 }
 
+// Notion rich_text content is capped at 2000 characters per text object —
+// truncate with an ellipsis rather than letting page creation 400.
+function truncateRichTextContent_(text, maxLen) {
+  var limit = maxLen || 2000;
+  if (!text || text.length <= limit) return text || '';
+  return text.substring(0, limit - 1) + '\u2026';
+}
+
+function dividerBlock_() {
+  return { type: 'divider', divider: {} };
+}
+
+function paragraphBlock_(text, annotations) {
+  var richText = { text: { content: truncateRichTextContent_(text) } };
+  if (annotations) richText.annotations = annotations;
+  return { type: 'paragraph', paragraph: { rich_text: [richText] } };
+}
+
+// Visually distinct Overview callout so the narrative isn't mistaken for
+// another unlabeled body paragraph above the bullet sections (confirmed
+// live: readers missed the weekly overview when it had no heading/chrome).
+function overviewCalloutBlock_(text) {
+  return {
+    type: 'callout',
+    callout: {
+      rich_text: [{ text: { content: truncateRichTextContent_(text) } }],
+      icon: { type: 'emoji', emoji: '\uD83D\uDCDD' },
+      color: 'gray_background'
+    }
+  };
+}
+
+// Standard Overview section used by both Daily and Weekly summary pages:
+// labeled H2 + callout body, so skimmers always find the narrative first.
+function overviewSectionBlocks_(overviewText) {
+  if (!overviewText) return [];
+  return [headingBlock_(2, 'Overview'), overviewCalloutBlock_(overviewText)];
+}
+
 // De-duplicates an array of strings (used for Meetings/Tasks relation IDs
 // aggregated across a week's worth of Daily Summary pages).
 function uniq_(arr) {

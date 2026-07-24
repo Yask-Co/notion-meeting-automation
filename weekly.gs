@@ -147,7 +147,8 @@ function requestWeeklyAssessment_(weekText) {
     '"overview" is a short narrative paragraph (3-5 sentences) giving a reader who skips everything else a real ' +
     'sense of what happened this week and where things stand — write it as flowing prose, not a list. Each of ' +
     'the other arrays should contain 2-6 short, concrete bullet points drawn only from the provided content; ' +
-    'use an empty array for any section with nothing relevant that week.';
+    'use an empty array for any section with nothing relevant that week. When referring to specific days, use ' +
+    'only the weekday/date labels present in the section headers — do not re-derive or shift weekdays.';
 
   var responseText = callClaude_(systemPrompt, weekText, 2000);
 
@@ -182,15 +183,11 @@ function createWeeklySummaryPage_(weekStart, meetingIds, taskIds, assessment) {
 
   var children = [];
 
-  // Narrative paragraph first — the categorized bullet sections below are
-  // useful for scanning specifics, but a reader who only reads one thing
-  // should get an actual "here's what happened this week" summary, not
-  // just bullet lists with no connective narrative.
+  // Labeled Overview callout first (same chrome as daily summaries) — a
+  // bare unlabeled paragraph above Themes was easy to miss in Notion.
   if (assessment.overview) {
-    children.push({
-      type: 'paragraph',
-      paragraph: { rich_text: [{ text: { content: assessment.overview } }] }
-    });
+    children = children.concat(overviewSectionBlocks_(assessment.overview));
+    children.push(dividerBlock_());
   }
 
   sections.forEach(function(section) {
@@ -198,13 +195,13 @@ function createWeeklySummaryPage_(weekStart, meetingIds, taskIds, assessment) {
 
     var items = assessment[section.key] || [];
     if (items.length === 0) {
-      children.push({
-        type: 'paragraph',
-        paragraph: { rich_text: [{ text: { content: 'Nothing notable this week.' }, annotations: { italic: true, color: 'gray' } }] }
-      });
+      children.push(paragraphBlock_('Nothing notable this week.', { italic: true, color: 'gray' }));
     } else {
       items.forEach(function(item) {
-        children.push({ type: 'bulleted_list_item', bulleted_list_item: { rich_text: [{ text: { content: item } }] } });
+        children.push({
+          type: 'bulleted_list_item',
+          bulleted_list_item: { rich_text: [{ text: { content: truncateRichTextContent_(item) } }] }
+        });
       });
     }
   });
