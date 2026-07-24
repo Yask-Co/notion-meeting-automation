@@ -19,6 +19,14 @@ var MEETINGS_CALENDAR_ID = 'megan@yask.co';
 // Page shared with the integration to hold the Summary database (setupSummaryDatabase() creates it as a child of this page).
 var SUMMARY_PARENT_PAGE_ID = '39f2d514-fe3a-80cf-8008-fdb0ef4ab43f';
 
+// ── Anthropic API constants ─────────────────────────────────────────────────
+
+var ANTHROPIC_API_VERSION = '2023-06-01';
+// A capable, cost-effective mid-tier model — plenty for reading a week of
+// meeting summaries and writing an assessment; no need for the top-end
+// (and pricier) Opus tier for this task.
+var ANTHROPIC_MODEL = 'claude-sonnet-5';
+
 // ── Script Properties accessors ─────────────────────────────────────────────
 
 function getNotionToken() {
@@ -31,6 +39,12 @@ function getSummaryDbId() {
   var id = PropertiesService.getScriptProperties().getProperty('SUMMARY_DB_ID');
   if (!id) throw new Error('SUMMARY_DB_ID not set in Script Properties — run setupSummaryDatabase() first');
   return id;
+}
+
+function getAnthropicApiKey() {
+  var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!key) throw new Error('ANTHROPIC_API_KEY not set in Script Properties');
+  return key;
 }
 
 // ── Low-level Notion HTTP helpers ────────────────────────────────────────────
@@ -75,6 +89,46 @@ function notionRequest_(method, path, payload) {
 function notionGet(path)            { return notionRequest_('get',   path, null);    }
 function notionPost(path, payload)  { return notionRequest_('post',  path, payload); }
 function notionPatch(path, payload) { return notionRequest_('patch', path, payload); }
+
+// ── Low-level Anthropic HTTP helper ─────────────────────────────────────────
+
+// Sends a single-turn request to Claude's Messages API and returns the
+// concatenated text of its response. Same muteHttpExceptions + explicit
+// error-throwing pattern as notionRequest_() — Claude's API also returns
+// errors as a normal (non-2xx) JSON body rather than a thrown exception.
+function callClaude_(systemPrompt, userMessage, maxTokens) {
+  var options = {
+    method: 'post',
+    headers: {
+      'x-api-key': getAnthropicApiKey(),
+      'anthropic-version': ANTHROPIC_API_VERSION,
+      'Content-Type': 'application/json'
+    },
+    payload: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    }),
+    muteHttpExceptions: true
+  };
+
+  var response = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', options);
+  var statusCode = response.getResponseCode();
+  var text = response.getContentText();
+  var body;
+  try {
+    body = JSON.parse(text);
+  } catch (e) {
+    throw new Error('Claude API returned a non-JSON response [' + statusCode + ']: ' + text.substring(0, 300));
+  }
+
+  if (body.type === 'error') {
+    throw new Error('Claude API error [' + statusCode + ']: ' + (body.error && body.error.message));
+  }
+
+  return (body.content || []).map(function(block) { return block.text || ''; }).join('');
+}
 
 // Fetches ALL children of a block, handling Notion's 100-result pagination.
 function notionGetAllChildren(blockId) {
@@ -147,6 +201,17 @@ function headingBlock_(level, text) {
   var block = { type: 'heading_' + level };
   block['heading_' + level] = { rich_text: [{ text: { content: text } }] };
   return block;
+}
+
+// De-duplicates an array of strings (used for Meetings/Tasks relation IDs
+// aggregated across a week's worth of Daily Summary pages).
+function uniq_(arr) {
+  var seen = {};
+  return arr.filter(function(x) {
+    if (seen[x]) return false;
+    seen[x] = true;
+    return true;
+  });
 }
 
 function linkBulletBlock_(text, url) {
