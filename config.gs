@@ -6,8 +6,26 @@ var NOTION_BASE_URL    = 'https://api.notion.com/v1';
 var MEETINGS_DB_ID = '39b2d514-fe3a-803d-b5bb-000bc511b02f';
 var TASKS_DB_ID    = '39b2d514-fe3a-809f-87ad-000bfb8b7851';
 
+// The calendar the actual meetings live on — a separate Google Workspace
+// account/calendar from whichever account authorizes/runs this script.
+// CalendarApp.getDefaultCalendar() would return the running account's OWN
+// calendar instead, which is why every event lookup previously failed
+// (confirmed via debugInspectDefaultCalendar()). This calendar must be
+// shared with the script's running account (at least "See all event
+// details", so guest lists are visible) for CalendarApp.getCalendarById()
+// to succeed.
+var MEETINGS_CALENDAR_ID = 'megan@yask.co';
+
 // Page shared with the integration to hold the Summary database (setupSummaryDatabase() creates it as a child of this page).
 var SUMMARY_PARENT_PAGE_ID = '39f2d514-fe3a-80cf-8008-fdb0ef4ab43f';
+
+// ── Anthropic API constants ─────────────────────────────────────────────────
+
+var ANTHROPIC_API_VERSION = '2023-06-01';
+// A capable, cost-effective mid-tier model — plenty for reading a week of
+// meeting summaries and writing an assessment; no need for the top-end
+// (and pricier) Opus tier for this task.
+var ANTHROPIC_MODEL = 'claude-sonnet-5';
 
 // ── Script Properties accessors ─────────────────────────────────────────────
 
@@ -21,6 +39,12 @@ function getSummaryDbId() {
   var id = PropertiesService.getScriptProperties().getProperty('SUMMARY_DB_ID');
   if (!id) throw new Error('SUMMARY_DB_ID not set in Script Properties — run setupSummaryDatabase() first');
   return id;
+}
+
+function getAnthropicApiKey() {
+  var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!key) throw new Error('ANTHROPIC_API_KEY not set in Script Properties');
+  return key;
 }
 
 // ── Low-level Notion HTTP helpers ────────────────────────────────────────────
@@ -65,6 +89,46 @@ function notionRequest_(method, path, payload) {
 function notionGet(path)            { return notionRequest_('get',   path, null);    }
 function notionPost(path, payload)  { return notionRequest_('post',  path, payload); }
 function notionPatch(path, payload) { return notionRequest_('patch', path, payload); }
+
+// ── Low-level Anthropic HTTP helper ─────────────────────────────────────────
+
+// Sends a single-turn request to Claude's Messages API and returns the
+// concatenated text of its response. Same muteHttpExceptions + explicit
+// error-throwing pattern as notionRequest_() — Claude's API also returns
+// errors as a normal (non-2xx) JSON body rather than a thrown exception.
+function callClaude_(systemPrompt, userMessage, maxTokens) {
+  var options = {
+    method: 'post',
+    headers: {
+      'x-api-key': getAnthropicApiKey(),
+      'anthropic-version': ANTHROPIC_API_VERSION,
+      'Content-Type': 'application/json'
+    },
+    payload: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    }),
+    muteHttpExceptions: true
+  };
+
+  var response = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', options);
+  var statusCode = response.getResponseCode();
+  var text = response.getContentText();
+  var body;
+  try {
+    body = JSON.parse(text);
+  } catch (e) {
+    throw new Error('Claude API returned a non-JSON response [' + statusCode + ']: ' + text.substring(0, 300));
+  }
+
+  if (body.type === 'error') {
+    throw new Error('Claude API error [' + statusCode + ']: ' + (body.error && body.error.message));
+  }
+
+  return (body.content || []).map(function(block) { return block.text || ''; }).join('');
+}
 
 // Fetches ALL children of a block, handling Notion's 100-result pagination.
 function notionGetAllChildren(blockId) {
@@ -139,10 +203,149 @@ function headingBlock_(level, text) {
   return block;
 }
 
+// Notion rich_text content is capped at 2000 characters per text object —
+// truncate with an ellipsis rather than letting page creation 400.
+function truncateRichTextContent_(text, maxLen) {
+  var limit = maxLen || 2000;
+  if (!text || text.length <= limit) return text || '';
+  return text.substring(0, limit - 1) + '\u2026';
+}
+
+function dividerBlock_() {
+  return { type: 'divider', divider: {} };
+}
+
+function paragraphBlock_(text, annotations) {
+  var richText = { text: { content: truncateRichTextContent_(text) } };
+  if (annotations) richText.annotations = annotations;
+  return { type: 'paragraph', paragraph: { rich_text: [richText] } };
+}
+
+// Visually distinct Overview callout so the narrative isn't mistaken for
+// another unlabeled body paragraph above the bullet sections (confirmed
+// live: readers missed the weekly overview when it had no heading/chrome).
+function overviewCalloutBlock_(text) {
+  return {
+    type: 'callout',
+    callout: {
+      rich_text: [{ text: { content: truncateRichTextContent_(text) } }],
+      icon: { type: 'emoji', emoji: '\uD83D\uDCDD' },
+      color: 'gray_background'
+    }
+  };
+}
+
+// Standard Overview section used by both Daily and Weekly summary pages:
+// labeled H2 + callout body, so skimmers always find the narrative first.
+function overviewSectionBlocks_(overviewText) {
+  if (!overviewText) return [];
+  return [headingBlock_(2, 'Overview'), overviewCalloutBlock_(overviewText)];
+}
+
+// De-duplicates an array of strings (used for Meetings/Tasks relation IDs
+// aggregated across a week's worth of Daily Summary pages).
+function uniq_(arr) {
+  var seen = {};
+  return arr.filter(function(x) {
+    if (seen[x]) return false;
+    seen[x] = true;
+    return true;
+  });
+}
+
 function linkBulletBlock_(text, url) {
   return {
     type: 'bulleted_list_item',
     bulleted_list_item: { rich_text: [{ text: { content: text, link: { url: url } } }] }
+  };
+}
+
+// Formats a meeting page's "Meeting Date" property (set by
+// syncMeetingCalendarFields_() from the matching Google Calendar event)
+// as a human-readable date + time, or null if it was never synced (e.g.
+// no matching calendar event was found).
+function meetingDateTimeLabel_(page) {
+  var dateProp = page.properties['Meeting Date'];
+  var start = dateProp && dateProp.date && dateProp.date.start;
+  if (!start) return null;
+
+  return Utilities.formatDate(new Date(start), Session.getScriptTimeZone(), 'MMM d, yyyy, h:mm a');
+}
+
+// Formats a meeting page's "Attendee Names" property (set by
+// syncMeetingCalendarFields_() from the matching Google Calendar event's
+// guest list) as a comma-separated string, or null if empty/never synced.
+function attendeeNamesLabel_(page) {
+  var namesProp = page.properties['Attendee Names'];
+  var options = namesProp && namesProp.multi_select;
+  if (!options || options.length === 0) return null;
+
+  return options.map(function(o) { return o.name; }).join(', ');
+}
+
+// Joins whichever of date/time and attendees are available into a single
+// "Jul 21, 2026, 2:00 PM  •  Attendees: a@x.com, b@y.com" string, or null
+// if the meeting page has neither (e.g. syncMeetingCalendarFields_()
+// never found a matching calendar event for it).
+function meetingMetaLabel_(page) {
+  var parts = [];
+  var dateTimeLabel = meetingDateTimeLabel_(page);
+  var attendeesLabel = attendeeNamesLabel_(page);
+  if (dateTimeLabel) parts.push(dateTimeLabel);
+  if (attendeesLabel) parts.push('Attendees: ' + attendeesLabel);
+
+  return parts.length > 0 ? parts.join('  •  ') : null;
+}
+
+// Bulleted list item for the summary page's "Meetings" section: the
+// meeting's linked title, plus its date/time and attendees inline when
+// available.
+function meetingSummaryBulletBlock_(page) {
+  var richText = [{ text: { content: pageTitle_(page), link: { url: page.url } } }];
+
+  var metaLabel = meetingMetaLabel_(page);
+  if (metaLabel) richText.push({ text: { content: '  —  ' + metaLabel } });
+
+  return { type: 'bulleted_list_item', bulleted_list_item: { rich_text: richText } };
+}
+
+// Grayed-out italic paragraph for the summary page's "Meeting Notes"
+// section, placed under each meeting's heading — shows date/time and
+// attendees, or returns null (so no empty paragraph is inserted) if
+// neither is available.
+function meetingMetaParagraphBlock_(page) {
+  var metaLabel = meetingMetaLabel_(page);
+  if (!metaLabel) return null;
+
+  return {
+    type: 'paragraph',
+    paragraph: { rich_text: [{ text: { content: metaLabel }, annotations: { italic: true, color: 'gray' } }] }
+  };
+}
+
+// Bulleted list item for the summary page's consolidated "Tasks"
+// section: the task's linked title, plus which meeting it came from
+// (resolved via the task's own "Source Meeting" relation against
+// meetingTitleById — an id-\>title map built from the already-fetched
+// meeting pages, so this needs no extra API calls) when available.
+function taskSummaryBulletBlock_(taskPage, meetingTitleById) {
+  var richText = [{ text: { content: pageTitle_(taskPage), link: { url: taskPage.url } } }];
+
+  var sourceMeetingRelation = taskPage.properties['Source Meeting'] && taskPage.properties['Source Meeting'].relation;
+  var sourceMeetingId = (sourceMeetingRelation && sourceMeetingRelation.length > 0) ? sourceMeetingRelation[0].id : null;
+  var sourceMeetingTitle = sourceMeetingId && meetingTitleById[sourceMeetingId];
+  if (sourceMeetingTitle) richText.push({ text: { content: '  —  from ' + sourceMeetingTitle } });
+
+  return { type: 'bulleted_list_item', bulleted_list_item: { rich_text: richText } };
+}
+
+// Grayed-out italic paragraph shown in place of the "Tasks" section
+// when a day's meetings produced no action items, so the section isn't
+// just silently empty with no explanation.
+function noTasksParagraphBlock_() {
+  return {
+    type: 'paragraph',
+    paragraph: { rich_text: [{ text: { content: 'No action items found in today\u2019s meetings.' }, annotations: { italic: true, color: 'gray' } }] }
   };
 }
 

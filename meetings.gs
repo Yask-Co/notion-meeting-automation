@@ -100,10 +100,16 @@ function addMeetingDatePropertyToMeetings() {
  * event is found.
  */
 function getGoogleCalendarAttendeeEmails_(startTime, endTime) {
-  var events = CalendarApp.getDefaultCalendar().getEvents(new Date(startTime), new Date(endTime));
-  if (events.length === 0) return [];
+  var events = CalendarApp.getCalendarById(MEETINGS_CALENDAR_ID).getEvents(new Date(startTime), new Date(endTime));
+  if (events.length === 0) {
+    Logger.log('getGoogleCalendarAttendeeEmails_: no matching Calendar event found for ' + startTime + ' – ' + endTime);
+    return [];
+  }
 
-  return events[0].getGuestList().map(function(guest) { return guest.getEmail(); });
+  // getGuestList() excludes the event's owner/organizer unless includeOwner
+  // is explicitly true — without this, every meeting organized by
+  // MEETINGS_CALENDAR_ID's own owner silently drops them from Attendee Names.
+  return events[0].getGuestList(true).map(function(guest) { return guest.getEmail(); });
 }
 
 /**
@@ -123,9 +129,14 @@ function getGoogleCalendarAttendeeEmails_(startTime, endTime) {
 function syncMeetingCalendarFields_(meetingId) {
   var transcriptionBlock = getTranscriptionBlock_(meetingId);
   var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
-  if (!calendarEvent) return;
+  if (!calendarEvent) {
+    Logger.log('syncMeetingCalendarFields_: ' + meetingId + ' — no calendar_event on transcription block, skipping');
+    return;
+  }
 
   var attendeeEmails = getGoogleCalendarAttendeeEmails_(calendarEvent.start_time, calendarEvent.end_time);
+  Logger.log('syncMeetingCalendarFields_: ' + meetingId + ' — event ' + calendarEvent.start_time + ' – ' +
+    calendarEvent.end_time + ' — ' + attendeeEmails.length + ' attendee(s): ' + attendeeEmails.join(', '));
 
   notionPatch('/pages/' + meetingId, {
     properties: {
@@ -157,10 +168,19 @@ function backfillMeetingCalendarFields() {
 
   Logger.log('backfillMeetingCalendarFields: found ' + meetings.length + ' meeting(s) total');
 
+  var failures = [];
   meetings.forEach(function(m) {
-    syncMeetingCalendarFields_(m.id);
-    Logger.log('backfillMeetingCalendarFields: synced ' + m.id);
+    try {
+      syncMeetingCalendarFields_(m.id);
+    } catch (e) {
+      // Without this, one bad meeting (e.g. a 400 from a stale property
+      // name) would throw and silently abort every meeting after it in
+      // the batch, with no indication in the log of how far it got.
+      failures.push(m.id);
+      Logger.log('backfillMeetingCalendarFields: FAILED on ' + m.id + ' — ' + e.message);
+    }
   });
 
-  Logger.log('backfillMeetingCalendarFields: done');
+  Logger.log('backfillMeetingCalendarFields: done — ' + (meetings.length - failures.length) + '/' +
+    meetings.length + ' succeeded' + (failures.length ? ', failed: ' + failures.join(', ') : ''));
 }
