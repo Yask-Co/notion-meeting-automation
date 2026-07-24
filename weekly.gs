@@ -142,10 +142,12 @@ function requestWeeklyAssessment_(weekText) {
   var systemPrompt = 'You are an assistant that reviews a week of business meeting summaries for a small ' +
     'company and produces a concise weekly assessment. Read the provided daily summaries (spanning one week, ' +
     'Sunday through Saturday) and respond with ONLY valid JSON — no markdown code fences, no commentary before ' +
-    'or after — matching exactly this shape: {"themes": [string, ...], "decisions": [string, ...], ' +
-    '"risks": [string, ...], "wins": [string, ...], "followUps": [string, ...]}. Each array should contain ' +
-    '2-6 short, concrete bullet points drawn only from the provided content; use an empty array for any ' +
-    'section with nothing relevant that week.';
+    'or after — matching exactly this shape: {"overview": string, "themes": [string, ...], ' +
+    '"decisions": [string, ...], "risks": [string, ...], "wins": [string, ...], "followUps": [string, ...]}. ' +
+    '"overview" is a short narrative paragraph (3-5 sentences) giving a reader who skips everything else a real ' +
+    'sense of what happened this week and where things stand — write it as flowing prose, not a list. Each of ' +
+    'the other arrays should contain 2-6 short, concrete bullet points drawn only from the provided content; ' +
+    'use an empty array for any section with nothing relevant that week.';
 
   var responseText = callClaude_(systemPrompt, weekText, 2000);
 
@@ -179,6 +181,18 @@ function createWeeklySummaryPage_(weekStart, meetingIds, taskIds, assessment) {
   ];
 
   var children = [];
+
+  // Narrative paragraph first — the categorized bullet sections below are
+  // useful for scanning specifics, but a reader who only reads one thing
+  // should get an actual "here's what happened this week" summary, not
+  // just bullet lists with no connective narrative.
+  if (assessment.overview) {
+    children.push({
+      type: 'paragraph',
+      paragraph: { rich_text: [{ text: { content: assessment.overview } }] }
+    });
+  }
+
   sections.forEach(function(section) {
     children.push(headingBlock_(2, section.heading));
 
