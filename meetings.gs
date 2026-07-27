@@ -94,22 +94,27 @@ function addMeetingDatePropertyToMeetings() {
 
 /**
  * Finds the Google Calendar event matching a meeting's start/end time and
- * returns its guests' email addresses — internal and external alike,
- * since Google Calendar invites always carry an email regardless of
- * whether that person has any Notion account. Returns [] if no matching
+ * returns display labels for its guests — prefers each guest's Calendar
+ * name (matches the cleaned "Attendee Names" multi-select options in
+ * Notion), falling back to email when no name is set. Still uses
+ * multi-select tags (not a people property) so Notion does not send
+ * assignment/mention notification emails. Returns [] if no matching
  * event is found.
  */
-function getGoogleCalendarAttendeeEmails_(startTime, endTime) {
+function getGoogleCalendarAttendeeLabels_(startTime, endTime) {
   var events = CalendarApp.getCalendarById(MEETINGS_CALENDAR_ID).getEvents(new Date(startTime), new Date(endTime));
   if (events.length === 0) {
-    Logger.log('getGoogleCalendarAttendeeEmails_: no matching Calendar event found for ' + startTime + ' – ' + endTime);
+    Logger.log('getGoogleCalendarAttendeeLabels_: no matching Calendar event found for ' + startTime + ' – ' + endTime);
     return [];
   }
 
   // getGuestList() excludes the event's owner/organizer unless includeOwner
   // is explicitly true — without this, every meeting organized by
   // MEETINGS_CALENDAR_ID's own owner silently drops them from Attendee Names.
-  return events[0].getGuestList(true).map(function(guest) { return guest.getEmail(); });
+  return events[0].getGuestList(true).map(function(guest) {
+    var name = (guest.getName() || '').trim();
+    return name || guest.getEmail();
+  });
 }
 
 /**
@@ -118,13 +123,15 @@ function getGoogleCalendarAttendeeEmails_(startTime, endTime) {
  * written by the user) — the actual meeting time/attendees, as opposed
  * to "Created on" which is just when the Notion page itself was created.
  * Attendees are read directly from the matching Google Calendar event
- * (by email, covering internal and external guests alike) rather than
- * resolved through Notion's /users/{id} endpoint — that only works for
- * workspace members/guests, and separately, writing to a Notion
- * people-type property would trigger an assignment/mention notification
- * email to everyone listed. Reading emails from Google Calendar and
- * writing them as multi-select tags avoids both problems entirely.
+ * (display name when available, else email) rather than resolved through
+ * Notion's /users/{id} endpoint — that only works for workspace
+ * members/guests, and separately, writing to a Notion people-type
+ * property would trigger an assignment/mention notification email to
+ * everyone listed. Writing multi-select tags avoids both problems.
  * No-ops silently if the page has no transcription block or calendar event.
+ *
+ * Does not touch "Meeting Type" (manual/select field added to the
+ * Meetings DB — Internal/HOW, Customer Discovery, Demo, Board, 1:1, Other).
  */
 function syncMeetingCalendarFields_(meetingId) {
   var transcriptionBlock = getTranscriptionBlock_(meetingId);
@@ -134,14 +141,14 @@ function syncMeetingCalendarFields_(meetingId) {
     return;
   }
 
-  var attendeeEmails = getGoogleCalendarAttendeeEmails_(calendarEvent.start_time, calendarEvent.end_time);
+  var attendeeLabels = getGoogleCalendarAttendeeLabels_(calendarEvent.start_time, calendarEvent.end_time);
   Logger.log('syncMeetingCalendarFields_: ' + meetingId + ' — event ' + calendarEvent.start_time + ' – ' +
-    calendarEvent.end_time + ' — ' + attendeeEmails.length + ' attendee(s): ' + attendeeEmails.join(', '));
+    calendarEvent.end_time + ' — ' + attendeeLabels.length + ' attendee(s): ' + attendeeLabels.join(', '));
 
   notionPatch('/pages/' + meetingId, {
     properties: {
       'Meeting Date': { date: { start: calendarEvent.start_time } },
-      'Attendee Names': { multi_select: attendeeEmails.map(function(email) { return { name: email }; }) }
+      'Attendee Names': { multi_select: attendeeLabels.map(function(label) { return { name: label }; }) }
     }
   });
 }
