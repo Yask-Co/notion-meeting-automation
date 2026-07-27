@@ -93,28 +93,109 @@ function addMeetingDatePropertyToMeetings() {
 }
 
 /**
- * Finds the Google Calendar event matching a meeting's start/end time and
- * returns display labels for its guests — prefers each guest's Calendar
- * name (matches the cleaned "Attendee Names" multi-select options in
- * Notion), falling back to email when no name is set. Still uses
- * multi-select tags (not a people property) so Notion does not send
- * assignment/mention notification emails. Returns [] if no matching
- * event is found.
+ * Sanitizes a string for use as a Notion multi_select option name.
+ * Notion rejects commas (and we also strip characters that tend to
+ * create noisy room-resource labels).
  */
-function getGoogleCalendarAttendeeLabels_(startTime, endTime) {
-  var events = CalendarApp.getCalendarById(MEETINGS_CALENDAR_ID).getEvents(new Date(startTime), new Date(endTime));
+function sanitizeMultiSelectOptionName_(label) {
+  return String(label || '')
+    .replace(/,/g, ';')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 100);
+}
+
+/**
+ * Finds the Google Calendar event matching a meeting and returns display
+ * labels for its guests — prefers each guest's Calendar name (matches
+ * cleaned "Attendee Names" options), falling back to email. Still uses
+ * multi-select tags (not a people property) so Notion does not send
+ * assignment/mention emails.
+ *
+ * Matching is intentionally picky: getEvents(start, end) returns every
+ * overlapping block (Focus Time, OOO, room holds, etc.). Taking
+ * events[0] caused Jul 20+ meetings to sync 0 attendees while older
+ * meetings (fewer overlapping blocks) still worked. We prefer DEFAULT
+ * events, then title similarity to meetingTitle, then guest count.
+ */
+function getGoogleCalendarAttendeeLabels_(startTime, endTime, meetingTitle) {
+  var cal = CalendarApp.getCalendarById(MEETINGS_CALENDAR_ID);
+  if (!cal) {
+    Logger.log('getGoogleCalendarAttendeeLabels_: getCalendarById(' + MEETINGS_CALENDAR_ID + ') returned null');
+    return [];
+  }
+
+  // Slightly widen the window so timezone/rounding edge cases still hit.
+  var start = new Date(new Date(startTime).getTime() - 60 * 1000);
+  var end   = new Date(new Date(endTime).getTime() + 60 * 1000);
+  var events = cal.getEvents(start, end);
   if (events.length === 0) {
     Logger.log('getGoogleCalendarAttendeeLabels_: no matching Calendar event found for ' + startTime + ' – ' + endTime);
     return [];
   }
 
-  // getGuestList() excludes the event's owner/organizer unless includeOwner
-  // is explicitly true — without this, every meeting organized by
-  // MEETINGS_CALENDAR_ID's own owner silently drops them from Attendee Names.
-  return events[0].getGuestList(true).map(function(guest) {
-    var name = (guest.getName() || '').trim();
-    return name || guest.getEmail();
+  var scored = events.map(function(event) {
+    var guests = event.getGuestList(true);
+    var title = event.getTitle() || '';
+    var typeName = 'DEFAULT';
+    try {
+      // Newer Calendar service — Focus Time / OOO / working-location blocks
+      // often overlap meeting times and have an empty guest list.
+      if (event.getEventType) typeName = String(event.getEventType());
+    } catch (e) {}
+
+    var score = 0;
+    // Prefer normal meetings; heavily penalize Focus Time / OOO / working-location
+    // blocks that often overlap and have empty guest lists.
+    if (/FOCUS|OUT_OF_OFFICE|WORKING_LOCATION|BIRTHDAY|FROM_GMAIL/i.test(typeName)) {
+      score -= 100;
+    } else {
+      score += 100;
+    }
+    if (guests.length > 0) score += 50 + guests.length;
+    if (meetingTitle) score += titleSimilarityScore_(meetingTitle, title);
+
+    Logger.log('getGoogleCalendarAttendeeLabels_: candidate "' + title +
+      '" type=' + typeName + ' guests=' + guests.length + ' score=' + score);
+
+    return { event: event, guests: guests, title: title, score: score };
   });
+
+  scored.sort(function(a, b) { return b.score - a.score; });
+  var best = scored[0];
+  Logger.log('getGoogleCalendarAttendeeLabels_: chose "' + best.title + '" (score=' + best.score +
+    ', ' + scored.length + ' overlapping event(s))');
+
+  return best.guests.map(function(guest) {
+    var name = (guest.getName() || '').trim();
+    return sanitizeMultiSelectOptionName_(name || guest.getEmail());
+  }).filter(function(label) { return !!label; });
+}
+
+// Rough title similarity for picking the right overlapping Calendar event —
+// strips the trailing ISO timestamp Notion often appends to meeting titles.
+function titleSimilarityScore_(notionTitle, calendarTitle) {
+  var a = normalizeMeetingTitle_(notionTitle);
+  var b = normalizeMeetingTitle_(calendarTitle);
+  if (!a || !b) return 0;
+  if (a === b) return 40;
+  if (a.indexOf(b) !== -1 || b.indexOf(a) !== -1) return 25;
+
+  var aWords = a.split(' ').filter(function(w) { return w.length > 2; });
+  var shared = 0;
+  aWords.forEach(function(w) {
+    if (b.indexOf(w) !== -1) shared++;
+  });
+  return Math.min(20, shared * 5);
+}
+
+function normalizeMeetingTitle_(title) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/\d{4}-\d{2}-\d{2}t[\d:.\-+z]+/gi, '')
+    .replace(/[^a-z0-9+ ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -122,18 +203,18 @@ function getGoogleCalendarAttendeeLabels_(startTime, endTime) {
  * from its calendar event (pulled from the transcription block, not
  * written by the user) — the actual meeting time/attendees, as opposed
  * to "Created on" which is just when the Notion page itself was created.
- * Attendees are read directly from the matching Google Calendar event
- * (display name when available, else email) rather than resolved through
- * Notion's /users/{id} endpoint — that only works for workspace
- * members/guests, and separately, writing to a Notion people-type
- * property would trigger an assignment/mention notification email to
- * everyone listed. Writing multi-select tags avoids both problems.
- * No-ops silently if the page has no transcription block or calendar event.
+ * Attendees are read from the matching Google Calendar event (display
+ * name when available, else email). Writing multi-select tags avoids
+ * Notion people-property mention/assignment emails.
  *
- * Does not touch "Meeting Type" (manual/select field added to the
- * Meetings DB — Internal/HOW, Customer Discovery, Demo, Board, 1:1, Other).
+ * If Calendar yields zero guests, leaves any existing Attendee Names
+ * alone (still updates Meeting Date) so a bad match cannot wipe a
+ * previously good backfill.
+ *
+ * Does not touch "Meeting Type".
  */
 function syncMeetingCalendarFields_(meetingId) {
+  var page = notionGet('/pages/' + meetingId);
   var transcriptionBlock = getTranscriptionBlock_(meetingId);
   var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
   if (!calendarEvent) {
@@ -141,16 +222,28 @@ function syncMeetingCalendarFields_(meetingId) {
     return;
   }
 
-  var attendeeLabels = getGoogleCalendarAttendeeLabels_(calendarEvent.start_time, calendarEvent.end_time);
+  var attendeeLabels = getGoogleCalendarAttendeeLabels_(
+    calendarEvent.start_time,
+    calendarEvent.end_time,
+    pageTitle_(page)
+  );
   Logger.log('syncMeetingCalendarFields_: ' + meetingId + ' — event ' + calendarEvent.start_time + ' – ' +
     calendarEvent.end_time + ' — ' + attendeeLabels.length + ' attendee(s): ' + attendeeLabels.join(', '));
 
-  notionPatch('/pages/' + meetingId, {
-    properties: {
-      'Meeting Date': { date: { start: calendarEvent.start_time } },
-      'Attendee Names': { multi_select: attendeeLabels.map(function(label) { return { name: label }; }) }
-    }
-  });
+  var properties = {
+    'Meeting Date': { date: { start: calendarEvent.start_time } }
+  };
+
+  if (attendeeLabels.length > 0) {
+    properties['Attendee Names'] = {
+      multi_select: attendeeLabels.map(function(label) { return { name: label }; })
+    };
+  } else {
+    Logger.log('syncMeetingCalendarFields_: ' + meetingId +
+      ' — 0 Calendar guests; leaving existing Attendee Names unchanged');
+  }
+
+  notionPatch('/pages/' + meetingId, { properties: properties });
 }
 
 /**

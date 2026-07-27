@@ -69,6 +69,28 @@ function debugInspectDefaultCalendar() {
 }
 
 /**
+ * Diagnostic: for one meeting page, logs every overlapping Google Calendar
+ * event (title, type, guest count/emails) so we can see why attendee sync
+ * picked a zero-guest block. Defaults to a known Jul 24 meeting.
+ */
+function debugInspectMeetingCalendarMatch() {
+  var meetingId = '3a72d514-fe3a-81cf-981a-c8679ce484b4'; // REV: Yask Onboarding Plan
+  var page = notionGet('/pages/' + meetingId);
+  var transcriptionBlock = getTranscriptionBlock_(meetingId);
+  var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
+  Logger.log('debugInspectMeetingCalendarMatch: page="' + pageTitle_(page) + '"');
+  Logger.log('debugInspectMeetingCalendarMatch: calendar_event=' + JSON.stringify(calendarEvent));
+  if (!calendarEvent) return;
+
+  var labels = getGoogleCalendarAttendeeLabels_(
+    calendarEvent.start_time,
+    calendarEvent.end_time,
+    pageTitle_(page)
+  );
+  Logger.log('debugInspectMeetingCalendarMatch: resolved labels=' + labels.join(', '));
+}
+
+/**
  * Verifies the script's running account can actually access
  * MEETINGS_CALENDAR_ID. getCalendarById() returns null (not an
  * exception) if that calendar hasn't been shared with the running
@@ -87,7 +109,7 @@ function debugVerifyMeetingsCalendarAccess() {
   Logger.log('debugVerifyMeetingsCalendarAccess: accessible — name="' + cal.getName() + '"');
 
   var start = new Date(2026, 6, 6);
-  var end   = new Date(2026, 6, 23);
+  var end   = new Date(2026, 6, 28);
   var events = cal.getEvents(start, end);
   Logger.log('debugVerifyMeetingsCalendarAccess: ' + events.length + ' event(s) found between ' + start + ' and ' + end + ':');
   events.forEach(function(e) {
