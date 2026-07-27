@@ -166,10 +166,85 @@ function getGoogleCalendarAttendeeLabels_(startTime, endTime, meetingTitle) {
   Logger.log('getGoogleCalendarAttendeeLabels_: chose "' + best.title + '" (score=' + best.score +
     ', ' + scored.length + ' overlapping event(s))');
 
-  return best.guests.map(function(guest) {
+  return resolveAttendeeLabelsForGuests_(best.event, best.guests);
+}
+
+/**
+ * Prefer human names whenever Google has one:
+ *   1. CalendarApp guest.getName()
+ *   2. Calendar API v3 attendee.displayName / organizer.displayName (often
+ *      populated when CalendarApp leaves getName() empty)
+ *   3. Google Contacts full name for that email
+ *   4. Email as last resort
+ */
+function resolveAttendeeLabelsForGuests_(calendarAppEvent, guests) {
+  var displayNameByEmail = fetchCalendarApiDisplayNamesForEvent_(calendarAppEvent);
+
+  return guests.map(function(guest) {
+    var email = (guest.getEmail() || '').trim();
+    var emailKey = email.toLowerCase();
     var name = (guest.getName() || '').trim();
-    return sanitizeMultiSelectOptionName_(name || guest.getEmail());
+
+    if (!name && emailKey && displayNameByEmail[emailKey]) {
+      name = displayNameByEmail[emailKey];
+    }
+    if (!name && email) {
+      name = lookupContactNameByEmail_(email);
+    }
+
+    return sanitizeMultiSelectOptionName_(name || email);
   }).filter(function(label) { return !!label; });
+}
+
+// Calendar API v3 often includes displayName for Workspace users even when
+// CalendarApp's getName() is blank — use the script's existing Calendar OAuth.
+function fetchCalendarApiDisplayNamesForEvent_(event) {
+  var map = {};
+  try {
+    var icalId = event.getId();
+    var url = 'https://www.googleapis.com/calendar/v3/calendars/' +
+      encodeURIComponent(MEETINGS_CALENDAR_ID) +
+      '/events?iCalUID=' + encodeURIComponent(icalId) +
+      '&maxResults=5';
+    var response = UrlFetchApp.fetch(url, {
+      method: 'get',
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+    if (response.getResponseCode() !== 200) {
+      Logger.log('fetchCalendarApiDisplayNamesForEvent_: HTTP ' + response.getResponseCode() +
+        ' — ' + response.getContentText().substring(0, 200));
+      return map;
+    }
+
+    var items = JSON.parse(response.getContentText()).items || [];
+    if (items.length === 0) return map;
+
+    var apiEvent = items[0];
+    (apiEvent.attendees || []).forEach(function(attendee) {
+      if (attendee.email && attendee.displayName) {
+        map[String(attendee.email).toLowerCase()] = String(attendee.displayName).trim();
+      }
+    });
+    if (apiEvent.organizer && apiEvent.organizer.email && apiEvent.organizer.displayName) {
+      map[String(apiEvent.organizer.email).toLowerCase()] = String(apiEvent.organizer.displayName).trim();
+    }
+  } catch (e) {
+    Logger.log('fetchCalendarApiDisplayNamesForEvent_: ' + e.message);
+  }
+  return map;
+}
+
+function lookupContactNameByEmail_(email) {
+  try {
+    var contacts = ContactsApp.getContactsByEmailAddress(email);
+    if (!contacts || contacts.length === 0) return '';
+    var fullName = (contacts[0].getFullName() || '').trim();
+    return fullName;
+  } catch (e) {
+    // Contacts scope may be missing — safe to ignore; email fallback still works.
+    return '';
+  }
 }
 
 // Rough title similarity for picking the right overlapping Calendar event —
@@ -203,9 +278,9 @@ function normalizeMeetingTitle_(title) {
  * from its calendar event (pulled from the transcription block, not
  * written by the user) — the actual meeting time/attendees, as opposed
  * to "Created on" which is just when the Notion page itself was created.
- * Attendees are read from the matching Google Calendar event (display
- * name when available, else email). Writing multi-select tags avoids
- * Notion people-property mention/assignment emails.
+ * Attendees prefer human names whenever Google provides one (CalendarApp
+ * name → Calendar API displayName → Contacts), then email. Writing
+ * multi-select tags avoids Notion people-property mention emails.
  *
  * If Calendar yields zero guests, leaves any existing Attendee Names
  * alone (still updates Meeting Date) so a bad match cannot wipe a
