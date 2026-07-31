@@ -45,6 +45,12 @@ function runWeeklyJob(targetDate) {
 
   var assessment = requestWeeklyAssessment_(dailySections.join('\n\n'));
 
+  // Re-runs (e.g. after catching up a missing daily) should replace the
+  // prior Weekly page for this week rather than leaving duplicates.
+  archiveWeeklySummariesForDate_(
+    Utilities.formatDate(week.start, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+  );
+
   var weeklyPage = createWeeklySummaryPage_(week.start, uniq_(meetingIds), uniq_(taskIds), assessment);
 
   Logger.log('runWeeklyJob: complete — weekly summary ' + weeklyPage.url);
@@ -146,11 +152,15 @@ function requestWeeklyAssessment_(weekText) {
     '"decisions": [string, ...], "risks": [string, ...], "wins": [string, ...], "followUps": [string, ...]}. ' +
     '"overview" is a short narrative paragraph (3-5 sentences) giving a reader who skips everything else a real ' +
     'sense of what happened this week and where things stand — write it as flowing prose, not a list. Each of ' +
-    'the other arrays should contain 2-6 short, concrete bullet points drawn only from the provided content; ' +
-    'use an empty array for any section with nothing relevant that week. When referring to specific days, use ' +
-    'only the weekday/date labels present in the section headers — do not re-derive or shift weekdays.';
+    'the other arrays should contain 2-6 short, concrete bullet points (under 25 words each) drawn only from ' +
+    'the provided content; use an empty array for any section with nothing relevant that week. Keep the whole ' +
+    'JSON compact — no padding, no extra keys. When referring to specific days, use only the weekday/date ' +
+    'labels present in the section headers — do not re-derive or shift weekdays.';
 
-  var responseText = callClaude_(systemPrompt, weekText, 2000);
+  // 2000 was truncating mid-overview once weeks had multiple long dailies
+  // ("Unterminated string in JSON"). 8192 leaves headroom for overview +
+  // five short bullet arrays without cutting the closing braces.
+  var responseText = callClaude_(systemPrompt, weekText, 8192);
 
   try {
     return JSON.parse(stripJsonFence_(responseText));

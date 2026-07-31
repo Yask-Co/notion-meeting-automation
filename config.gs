@@ -96,6 +96,8 @@ function notionPatch(path, payload) { return notionRequest_('patch', path, paylo
 // concatenated text of its response. Same muteHttpExceptions + explicit
 // error-throwing pattern as notionRequest_() — Claude's API also returns
 // errors as a normal (non-2xx) JSON body rather than a thrown exception.
+// Throws if stop_reason is max_tokens so callers don't try to parse a
+// truncated JSON blob as if it were complete.
 function callClaude_(systemPrompt, userMessage, maxTokens) {
   var options = {
     method: 'post',
@@ -127,7 +129,12 @@ function callClaude_(systemPrompt, userMessage, maxTokens) {
     throw new Error('Claude API error [' + statusCode + ']: ' + (body.error && body.error.message));
   }
 
-  return (body.content || []).map(function(block) { return block.text || ''; }).join('');
+  var output = (body.content || []).map(function(block) { return block.text || ''; }).join('');
+  if (body.stop_reason === 'max_tokens') {
+    throw new Error('Claude response truncated (hit max_tokens=' + maxTokens +
+      ') — raise the limit or shorten the prompt. Partial text: ' + output.substring(0, 300));
+  }
+  return output;
 }
 
 // Fetches ALL children of a block, handling Notion's 100-result pagination.

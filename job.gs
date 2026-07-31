@@ -248,6 +248,35 @@ function archiveDailySummariesForDate_(dayIso) {
   Logger.log('archiveDailySummariesForDate_: archived ' + archived + ' page(s) for ' + dayIso);
 }
 
+// Archives existing Type=Weekly summary pages dated weekStartIso so a
+// weekly re-run doesn't leave duplicate Weekly Summary pages.
+function archiveWeeklySummariesForDate_(weekStartIso) {
+  var cursor = null;
+  var archived = 0;
+
+  do {
+    var payload = {
+      filter: {
+        and: [
+          { property: 'Type', select: { equals: 'Weekly' } },
+          { property: 'Date', date: { equals: weekStartIso } }
+        ]
+      }
+    };
+    if (cursor) payload.start_cursor = cursor;
+
+    var result = notionPost('/data_sources/' + getSummaryDbId() + '/query', payload);
+    (result.results || []).forEach(function(page) {
+      notionPatch('/pages/' + page.id, { archived: true });
+      archived++;
+      Logger.log('archiveWeeklySummariesForDate_: archived ' + page.id + ' (' + pageTitle_(page) + ')');
+    });
+    cursor = result.has_more ? result.next_cursor : null;
+  } while (cursor);
+
+  Logger.log('archiveWeeklySummariesForDate_: archived ' + archived + ' page(s) for ' + weekStartIso);
+}
+
 /**
  * Phase 7 — One-time setup: installs a daily time-based trigger for
  * runDailyJob() at 8 PM (script timezone). Safe to run more than once —
