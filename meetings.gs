@@ -1,9 +1,11 @@
 /**
  * Phase 1 — Query the Meetings database for meetings that actually took
- * place on targetDate (by calendar_event.start_time — the real meeting
- * time, not when the Notion page happened to be created). Defaults to
- * today if targetDate is omitted; pass e.g. new Date('2026-07-20') to
- * catch up on a missed prior day. Returns an array of Notion page objects.
+ * place on targetDate. Primary signal is transcription.calendar_event
+ * start_time; pages without that (common for teammate AI notes) are also
+ * included when their Meeting Date property falls on the same day.
+ * Defaults to today if targetDate is omitted; pass e.g.
+ * new Date('2026-07-20') to catch up on a missed prior day. Returns an
+ * array of Notion page objects.
  *
  * Run this function directly in the Apps Script editor to verify it finds
  * your recent meeting pages before moving to phase 2.
@@ -48,16 +50,37 @@ function fetchNewMeetings(targetDate) {
   // Filtered on the meeting's actual date, not page creation time — those
   // diverge whenever Notion Calendar bulk-syncs/backfills notes, which
   // would otherwise make old meetings look "new."
-  var meetings = candidates.filter(function(m) {
+  var meetingById = {};
+  candidates.forEach(function(m) {
     var transcriptionBlock = getTranscriptionBlock_(m.id);
     var calendarEvent = transcriptionBlock && transcriptionBlock.transcription.calendar_event;
-    if (!calendarEvent) return false;
+    if (!calendarEvent) return;
 
     var meetingTime = new Date(calendarEvent.start_time).getTime();
-    return meetingTime >= dayStart.getTime() && meetingTime < dayEnd.getTime();
+    if (meetingTime >= dayStart.getTime() && meetingTime < dayEnd.getTime()) {
+      meetingById[m.id] = m;
+    }
   });
 
-  Logger.log('fetchNewMeetings: found ' + meetings.length + ' meeting(s)');
+  // Teammate (and some AI-notes) pages often live in the same Meetings DB
+  // with a Meeting Date set, but without a Notion Calendar calendar_event
+  // on the transcription block. Those were previously skipped entirely.
+  // Merge them in by Meeting Date for the same day (de-duped by page id).
+  var dayIso = Utilities.formatDate(dayStart, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var nextIso = Utilities.formatDate(dayEnd, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var byMeetingDate = fetchMeetingsWithMeetingDateInRange_(dayIso, nextIso);
+  var addedByMeetingDate = 0;
+  byMeetingDate.forEach(function(m) {
+    if (!meetingById[m.id]) {
+      meetingById[m.id] = m;
+      addedByMeetingDate++;
+    }
+  });
+
+  var meetings = Object.keys(meetingById).map(function(id) { return meetingById[id]; });
+
+  Logger.log('fetchNewMeetings: found ' + meetings.length + ' meeting(s)' +
+    (addedByMeetingDate ? ' (' + addedByMeetingDate + ' via Meeting Date fallback)' : ''));
 
   meetings.forEach(function(m) {
     var nameProp = m.properties['Name'];
