@@ -6,8 +6,8 @@
  * Notion classification guide) to pick Ops / Design / Engineering, and
  * writes Suggested Team + Review Status = "Pending Review".
  *
- * Slack digest (Step 2) and Linear sync (Step 3) are intentionally not
- * wired yet — verify Suggested Team values in Notion first.
+ * Slack digest (Step 2) runs next via postPendingTasksSlackDigest().
+ * Linear sync (Step 3) stays on a separate later trigger.
  *
  * Manual: run classifyUnreviewedTasks() from the Apps Script editor.
  * Automatic: processMeetings_() calls this after the daily summary page

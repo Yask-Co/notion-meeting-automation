@@ -50,11 +50,19 @@ function processMeetings_(meetings, targetDate) {
 
   // Step 1 — classify newly created / still-unreviewed tasks for Linear
   // team suggestion. Soft-fail so a guide/Claude hiccup cannot undo the
-  // summary that already succeeded. Slack + Linear sync come later.
+  // summary that already succeeded.
   try {
     classifyUnreviewedTasks(taskIds);
   } catch (e) {
     Logger.log('processMeetings_: classifyUnreviewedTasks failed — ' + e.message);
+  }
+
+  // Step 2 — Slack digest of all Pending Review tasks for human approval.
+  // Linear ticket creation (Step 3) stays on a separate later trigger.
+  try {
+    postPendingTasksSlackDigest();
+  } catch (e) {
+    Logger.log('processMeetings_: postPendingTasksSlackDigest failed — ' + e.message);
   }
 
   Logger.log('processMeetings_: complete — summary page ' + summaryPage.url);

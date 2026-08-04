@@ -39,6 +39,9 @@ var ANTHROPIC_MODEL = 'claude-sonnet-5';
 // Model used only for Task → Linear team classification (Step 1).
 var CLASSIFICATION_MODEL = 'claude-sonnet-4-6';
 
+// Slack channel for the Pending Review task digest (#yask-task-linear).
+var SLACK_TASK_LINEAR_CHANNEL_ID = 'C0BMJEZMTNX';
+
 // ── Script Properties accessors ─────────────────────────────────────────────
 
 function getNotionToken() {
@@ -57,6 +60,12 @@ function getAnthropicApiKey() {
   var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
   if (!key) throw new Error('ANTHROPIC_API_KEY not set in Script Properties');
   return key;
+}
+
+function getSlackBotToken() {
+  var token = PropertiesService.getScriptProperties().getProperty('SLACK_BOT_TOKEN');
+  if (!token) throw new Error('SLACK_BOT_TOKEN not set in Script Properties');
+  return token;
 }
 
 // ── Low-level Notion HTTP helpers ────────────────────────────────────────────
