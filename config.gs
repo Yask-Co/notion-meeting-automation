@@ -19,6 +19,16 @@ var MEETINGS_CALENDAR_ID = 'megan@yask.co';
 // Page shared with the integration to hold the Summary database (setupSummaryDatabase() creates it as a child of this page).
 var SUMMARY_PARENT_PAGE_ID = '39f2d514-fe3a-80cf-8008-fdb0ef4ab43f';
 
+// Notion page: "Task → Linear Team Classification Guide". Must be shared
+// with the same integration as NOTION_TOKEN. Re-read every classification
+// run — do not hardcode its contents in code.
+var TEAM_CLASSIFICATION_GUIDE_PAGE_ID = '3b12d514-fe3a-8127-a412-c17cd7390c42';
+
+// Caps Claude calls per classifyUnreviewedTasks() invocation so a large
+// backlog of empty Review Status rows cannot blow Apps Script's time limit.
+// Re-run (or wait for subsequent daily jobs) to continue the backlog.
+var CLASSIFY_MAX_PER_RUN = 25;
+
 // ── Anthropic API constants ─────────────────────────────────────────────────
 
 var ANTHROPIC_API_VERSION = '2023-06-01';
@@ -26,6 +36,8 @@ var ANTHROPIC_API_VERSION = '2023-06-01';
 // meeting summaries and writing an assessment; no need for the top-end
 // (and pricier) Opus tier for this task.
 var ANTHROPIC_MODEL = 'claude-sonnet-5';
+// Model used only for Task → Linear team classification (Step 1).
+var CLASSIFICATION_MODEL = 'claude-sonnet-4-6';
 
 // ── Script Properties accessors ─────────────────────────────────────────────
 
@@ -97,8 +109,9 @@ function notionPatch(path, payload) { return notionRequest_('patch', path, paylo
 // error-throwing pattern as notionRequest_() — Claude's API also returns
 // errors as a normal (non-2xx) JSON body rather than a thrown exception.
 // Throws if stop_reason is max_tokens so callers don't try to parse a
-// truncated JSON blob as if it were complete.
-function callClaude_(systemPrompt, userMessage, maxTokens) {
+// truncated JSON blob as if it were complete. Optional `model` overrides
+// ANTHROPIC_MODEL (used by team classification for claude-sonnet-4-6).
+function callClaude_(systemPrompt, userMessage, maxTokens, model) {
   var options = {
     method: 'post',
     headers: {
@@ -107,7 +120,7 @@ function callClaude_(systemPrompt, userMessage, maxTokens) {
       'Content-Type': 'application/json'
     },
     payload: JSON.stringify({
-      model: ANTHROPIC_MODEL,
+      model: model || ANTHROPIC_MODEL,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }]

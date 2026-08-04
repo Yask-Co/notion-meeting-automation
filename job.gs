@@ -48,6 +48,15 @@ function processMeetings_(meetings, targetDate) {
 
   var summaryPage = createDailySummaryPage(meetingIds, taskIds, targetDate);
 
+  // Step 1 — classify newly created / still-unreviewed tasks for Linear
+  // team suggestion. Soft-fail so a guide/Claude hiccup cannot undo the
+  // summary that already succeeded. Slack + Linear sync come later.
+  try {
+    classifyUnreviewedTasks(taskIds);
+  } catch (e) {
+    Logger.log('processMeetings_: classifyUnreviewedTasks failed — ' + e.message);
+  }
+
   Logger.log('processMeetings_: complete — summary page ' + summaryPage.url);
   return summaryPage;
 }
