@@ -83,7 +83,8 @@ function classifyUnreviewedTasks(preferIds) {
   return { classified: classified, remaining: remaining, errors: errors };
 }
 
-// Queries Tasks where Review Status has no select value yet.
+// Queries Tasks where Review Status has no select value yet AND Planning
+// is not Done — completed work should not enter the Linear review queue.
 function fetchTasksWithEmptyReviewStatus_() {
   var pages = [];
   var cursor = null;
@@ -91,8 +92,10 @@ function fetchTasksWithEmptyReviewStatus_() {
   do {
     var payload = {
       filter: {
-        property: 'Review Status',
-        select: { is_empty: true }
+        and: [
+          { property: 'Review Status', select: { is_empty: true } },
+          { property: 'Planning', status: { does_not_equal: 'Done' } }
+        ]
       },
       sorts: [{ timestamp: 'created_time', direction: 'ascending' }]
     };
