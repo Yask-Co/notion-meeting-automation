@@ -42,6 +42,23 @@ var CLASSIFICATION_MODEL = 'claude-sonnet-4-6';
 // Slack channel for the Pending Review task digest (#yask-task-linear).
 var SLACK_TASK_LINEAR_CHANNEL_ID = 'C0BMJEZMTNX';
 
+// Linear teams + Triage workflow states for synced Notion tasks.
+// Tickets are always created in Triage — never backlog / ready-for-dev.
+var LINEAR_TEAMS = {
+  Ops: {
+    teamId: '8451557e-1db6-45dd-a474-501856d4aa54',
+    triageStateId: 'ae759009-d0f7-40d5-9f40-b59ca1a75fb8'
+  },
+  Design: {
+    teamId: '39edc979-1f20-4658-a80d-678fa63e12ad',
+    triageStateId: 'fa5eb49c-7495-4397-9274-69e06442f056'
+  },
+  Engineering: {
+    teamId: 'c9244e16-56fb-4744-aaec-1c0e6713e44d',
+    triageStateId: 'c441ed25-7f60-4a44-ad46-f13a65cf1e62'
+  }
+};
+
 // ── Script Properties accessors ─────────────────────────────────────────────
 
 function getNotionToken() {
@@ -66,6 +83,12 @@ function getSlackBotToken() {
   var token = PropertiesService.getScriptProperties().getProperty('SLACK_BOT_TOKEN');
   if (!token) throw new Error('SLACK_BOT_TOKEN not set in Script Properties');
   return token;
+}
+
+function getLinearApiKey() {
+  var key = PropertiesService.getScriptProperties().getProperty('LINEAR_API_KEY');
+  if (!key) throw new Error('LINEAR_API_KEY not set in Script Properties');
+  return key;
 }
 
 // ── Low-level Notion HTTP helpers ────────────────────────────────────────────
