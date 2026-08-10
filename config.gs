@@ -29,6 +29,12 @@ var TEAM_CLASSIFICATION_GUIDE_PAGE_ID = '3b12d514-fe3a-8127-a412-c17cd7390c42';
 // Re-run (or wait for subsequent daily jobs) to continue the backlog.
 var CLASSIFY_MAX_PER_RUN = 25;
 
+// When false, the nightly daily job still builds the Daily Summary (and the
+// weekly rollup is unchanged) but does NOT create Notion Tasks, classify
+// them, post the Slack digest, or sync Approved rows to Linear. Flip to
+// true to re-enable the full task → Slack → Linear pipeline.
+var ENABLE_TASK_PIPELINE = false;
+
 // ── Anthropic API constants ─────────────────────────────────────────────────
 
 var ANTHROPIC_API_VERSION = '2023-06-01';

@@ -17,6 +17,11 @@
 function postPendingTasksSlackDigest() {
   Logger.log('postPendingTasksSlackDigest: start');
 
+  if (!ENABLE_TASK_PIPELINE) {
+    Logger.log('postPendingTasksSlackDigest: ENABLE_TASK_PIPELINE=false — skipping');
+    return { posted: false, count: 0, messages: 0 };
+  }
+
   var pending = fetchTasksPendingReview_();
   Logger.log('postPendingTasksSlackDigest: ' + pending.length + ' Pending Review task(s)');
 

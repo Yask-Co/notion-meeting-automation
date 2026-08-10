@@ -32,37 +32,47 @@ function runDailyJob(targetDate) {
 function processMeetings_(meetings, targetDate) {
   var meetingIds = meetings.map(function(m) { return m.id; });
 
-  var taskPages = [];
   meetings.forEach(function(meeting) {
     syncMeetingCalendarFields_(meeting.id);
-    var actionItems = extractActionItems(meeting.id);
-
-    // Inherit the meeting's own Project relation onto its tasks, if set.
-    var projectRelation = meeting.properties['Project'] && meeting.properties['Project'].relation;
-    var projectId = (projectRelation && projectRelation.length > 0) ? projectRelation[0].id : null;
-
-    taskPages = taskPages.concat(createTaskPages(actionItems, projectId, meeting.id));
   });
 
-  var taskIds = taskPages.map(function(p) { return p.id; });
+  var taskIds = [];
+  if (ENABLE_TASK_PIPELINE) {
+    var taskPages = [];
+    meetings.forEach(function(meeting) {
+      var actionItems = extractActionItems(meeting.id);
+
+      // Inherit the meeting's own Project relation onto its tasks, if set.
+      var projectRelation = meeting.properties['Project'] && meeting.properties['Project'].relation;
+      var projectId = (projectRelation && projectRelation.length > 0) ? projectRelation[0].id : null;
+
+      taskPages = taskPages.concat(createTaskPages(actionItems, projectId, meeting.id));
+    });
+    taskIds = taskPages.map(function(p) { return p.id; });
+  } else {
+    Logger.log('processMeetings_: ENABLE_TASK_PIPELINE=false — skipping Notion task creation, ' +
+      'classification, and Slack digest (daily summary only)');
+  }
 
   var summaryPage = createDailySummaryPage(meetingIds, taskIds, targetDate);
 
-  // Step 1 — classify newly created / still-unreviewed tasks for Linear
-  // team suggestion. Soft-fail so a guide/Claude hiccup cannot undo the
-  // summary that already succeeded.
-  try {
-    classifyUnreviewedTasks(taskIds);
-  } catch (e) {
-    Logger.log('processMeetings_: classifyUnreviewedTasks failed — ' + e.message);
-  }
+  if (ENABLE_TASK_PIPELINE) {
+    // Step 1 — classify newly created / still-unreviewed tasks for Linear
+    // team suggestion. Soft-fail so a guide/Claude hiccup cannot undo the
+    // summary that already succeeded.
+    try {
+      classifyUnreviewedTasks(taskIds);
+    } catch (e) {
+      Logger.log('processMeetings_: classifyUnreviewedTasks failed — ' + e.message);
+    }
 
-  // Step 2 — Slack digest of all Pending Review tasks for human approval.
-  // Linear ticket creation (Step 3) stays on a separate later trigger.
-  try {
-    postPendingTasksSlackDigest();
-  } catch (e) {
-    Logger.log('processMeetings_: postPendingTasksSlackDigest failed — ' + e.message);
+    // Step 2 — Slack digest of all Pending Review tasks for human approval.
+    // Linear ticket creation (Step 3) stays on a separate later trigger.
+    try {
+      postPendingTasksSlackDigest();
+    } catch (e) {
+      Logger.log('processMeetings_: postPendingTasksSlackDigest failed — ' + e.message);
+    }
   }
 
   Logger.log('processMeetings_: complete — summary page ' + summaryPage.url);

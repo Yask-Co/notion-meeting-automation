@@ -22,6 +22,11 @@
 function syncApprovedTasksToLinear() {
   Logger.log('syncApprovedTasksToLinear: start');
 
+  if (!ENABLE_TASK_PIPELINE) {
+    Logger.log('syncApprovedTasksToLinear: ENABLE_TASK_PIPELINE=false — skipping Linear sync');
+    return { synced: 0, skipped: 0, errors: 0 };
+  }
+
   var approved = fetchTasksApprovedForLinear_();
   Logger.log('syncApprovedTasksToLinear: ' + approved.length + ' Approved task(s)');
 
@@ -105,6 +110,18 @@ function installLinearSyncTrigger() {
 
   Logger.log('installLinearSyncTrigger: Linear sync trigger installed for 10 PM' +
     (existing.length ? ' (replaced ' + existing.length + ' existing trigger(s))' : ''));
+}
+
+/**
+ * Removes the 10 PM Linear sync trigger. Safe to run when the task
+ * pipeline is disabled so Approved rows are not pushed overnight.
+ */
+function removeLinearSyncTrigger() {
+  var existing = ScriptApp.getProjectTriggers().filter(function(trigger) {
+    return trigger.getHandlerFunction() === 'syncApprovedTasksToLinear';
+  });
+  existing.forEach(function(trigger) { ScriptApp.deleteTrigger(trigger); });
+  Logger.log('removeLinearSyncTrigger: removed ' + existing.length + ' trigger(s)');
 }
 
 function fetchTasksApprovedForLinear_() {

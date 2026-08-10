@@ -27,6 +27,11 @@ var VALID_SUGGESTED_TEAMS_ = { Ops: true, Design: true, Engineering: true };
 function classifyUnreviewedTasks(preferIds) {
   Logger.log('classifyUnreviewedTasks: start');
 
+  if (!ENABLE_TASK_PIPELINE) {
+    Logger.log('classifyUnreviewedTasks: ENABLE_TASK_PIPELINE=false — skipping');
+    return { classified: 0, remaining: 0, errors: 0 };
+  }
+
   var guideText = fetchClassificationGuideText_();
   if (!guideText || !guideText.trim()) {
     throw new Error('classifyUnreviewedTasks: classification guide page is empty — ' +
