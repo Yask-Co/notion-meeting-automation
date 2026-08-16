@@ -255,3 +255,23 @@ function installWeeklyTrigger() {
   Logger.log('installWeeklyTrigger: weekly trigger installed for Saturday 8 PM' +
     (existing.length ? ' (replaced ' + existing.length + ' existing trigger(s))' : ''));
 }
+
+/**
+ * Zero-argument helper for the Apps Script Run button (which cannot pass
+ * a Date). Runs runWeeklyJob() for the previous Sunday–Saturday week —
+ * i.e. the week that ended yesterday if today is Sunday, or the most
+ * recently completed Sat if run mid-week.
+ *
+ * Example: on Sun Aug 16 this covers Sun Aug 9 – Sat Aug 15.
+ */
+function runWeeklyJobForPreviousWeek() {
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // Step back into the prior week: if today is Sunday (getDay()===0),
+  // yesterday is still "last week"; otherwise go to last Saturday, then
+  // any day in that week is fine for weekRangeFor_.
+  var prior = new Date(today);
+  prior.setDate(prior.getDate() - ((today.getDay() + 6) % 7 + 1)); // last Saturday
+  Logger.log('runWeeklyJobForPreviousWeek: using ' + prior.toDateString());
+  return runWeeklyJob(prior);
+}
